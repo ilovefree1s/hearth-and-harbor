@@ -511,12 +511,12 @@ const newCode=()=>Array.from({length:5},()=>CODECHARS[Math.random()*CODECHARS.le
 function setName(){const n=cleanName(L.nameDraft);if(!n){L.err='Enter a name first.';render();return null}MYNAME=n;store.set('hh-name',n);return n}
 $('#lobby').addEventListener('input',e=>{if(e.target.id==='nm')L.nameDraft=e.target.value;if(e.target.id==='cd')L.codeDraft=e.target.value.toUpperCase()});
 $('#lobby').addEventListener('click',async e=>{const b=e.target.closest('[data-l]');if(!b||b.disabled)return;const a=b.dataset.l;L.err='';
-  if(a==='create'){const n=setName();if(!n)return;b.disabled=true;
-    for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n}],v:1};
-      const{error}=await sb.from('hh_games').insert({id:code,state:st,v:1});
-      if(!error){await connect(code);return}
-      if(!String(error.code).startsWith('23')){L.err='Could not create the game: '+esc(error.message);render();return}}
-    return}
+  if(a==='create'){const n=setName();if(!n)return;b.disabled=true;await createGame(n);return}
+  if(a==='quick'){const n=setName();if(!n)return;b.disabled=true;b.textContent='Looking for a game…';
+    const open=await findOpen();
+    if(open.length){const pick=open.find(r=>r.state.seats.some(s=>s.uid===UID))||open[0];if(await connect(pick.id)&&G.phase==='lobby')await joinSeat();return}
+    await createGame(n);return}
+  if(a==='openjoin'){const n=setName();if(!n)return;if(await connect(b.dataset.id)&&G.phase==='lobby')await joinSeat();return}
   if(a==='join'){const n=setName();if(!n)return;const code=cleanName(L.codeDraft).toUpperCase().replace(/[^A-Z0-9]/g,'');if(!code){L.err='Enter the game code.';render();return}
     if(await connect(code)&&G.phase==='lobby')await joinSeat();return}
   if(a==='joinseat'){if(!setName())return;await joinSeat();return}
@@ -524,6 +524,20 @@ $('#lobby').addEventListener('click',async e=>{const b=e.target.closest('[data-l
   if(a==='copy'){copyLink();return}
   if(a==='leave'){CODE=null;G=null;ME=-1;clearInterval(pollTimer);if(chan){sb.removeChannel(chan);chan=null}history.replaceState(null,'',location.pathname);render()}
 });
+async function createGame(n){
+  for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n}],v:1};
+    const{error}=await sb.from('hh_games').insert({id:code,state:st,v:1});
+    if(!error){await connect(code);return}
+    if(!String(error.code).startsWith('23')){L.err='Could not create the game: '+esc(error.message);render();return}}}
+/* open games: lobbies touched in the last 30 minutes with a free seat */
+async function findOpen(){try{const since=new Date(Date.now()-30*60*1000).toISOString();
+  const{data,error}=await sb.from('hh_games').select('id,state,updated_at').eq('state->>phase','lobby').gte('updated_at',since).order('updated_at',{ascending:false}).limit(10);
+  if(error)return [];return (data||[]).filter(r=>Array.isArray(r.state.seats)&&r.state.seats.length<4)}catch(e){return []}}
+let openTimer=null;
+async function refreshOpen(){if(G||!sb)return;const list=await findOpen();if(G)return;
+  const sig=JSON.stringify(list.map(r=>[r.id,r.state.seats.length]));if(sig!==L.openSig){L.open=list;L.openSig=sig;
+    const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;render();
+    if(f){const el=document.getElementById(f);if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(e){}}}}}
 async function joinSeat(){await mutate(()=>{if(G.phase!=='lobby')return false;const s=G.seats.find(s=>s.uid===UID);if(s){s.name=MYNAME;return}
   if(G.seats.length>=4){L.err='This game already has 4 players.';return false}G.seats.push({uid:UID,name:MYNAME})})}
 function renderLobby(){const el=$('#lobby');let h;
@@ -531,8 +545,13 @@ function renderLobby(){const el=$('#lobby');let h;
   if(!sb)h=`<h1>Hearth &amp; Harbor</h1><p>This copy isn't connected to a game server yet. Open <b>index.html</b>, fill in <b>SUPABASE_URL</b> and <b>SUPABASE_ANON_KEY</b> near the top, and upload it again.</p>`;
   else if(!G)h=`<h1>Hearth &amp; Harbor</h1><p>Build, trade and race your friends to 10 points.</p>
     <div><label for="nm">Your name</label><input id="nm" maxlength="16" autocomplete="nickname" value="${esc(L.nameDraft)}" placeholder="e.g. Sam"></div>
-    <button class="primary" data-l="create">Create a game</button>
-    <div class="or">or join one</div>
+    <button class="primary" data-l="quick">Quick join</button>
+    <p style="font-size:13px;margin-top:-6px">Jumps into a game that's waiting for players, or starts a new one if none is open.</p>
+    ${L.open&&L.open.length?`<div><label>Open games</label><div class="seats">${L.open.map(r=>{const host=r.state.seats.find(s=>s.uid===r.state.host)||r.state.seats[0];
+      return `<div class="seat"><b>${esc(host?host.name:'Someone')}'s game</b><span class="tag" style="margin-left:6px">${r.state.seats.length} of 4</span><button style="margin-left:auto" data-l="openjoin" data-id="${esc(r.id)}">Join</button></div>`}).join('')}</div></div>`:'<p style="font-size:13px">No open games right now.</p>'}
+    <div class="or">or</div>
+    <button data-l="create">Start a new game</button>
+    <div class="or">join with a code</div>
     <div class="lrow"><div><label for="cd">Game code</label><input id="cd" maxlength="5" autocapitalize="characters" value="${esc(L.codeDraft)}" placeholder="ABCDE"></div><button data-l="join">Join</button></div>${err}`;
   else{const seated=G.seats.some(s=>s.uid===UID),host=G.host===UID,bots=4-G.seats.length;
     h=`<h1>Hearth &amp; Harbor</h1><div><label>Game code</label><div class="code">${esc(CODE)}</div></div>
@@ -671,6 +690,7 @@ function render(){
   if(CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_ANON_KEY&&window.supabase)sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY);
   const code=new URLSearchParams(location.search).get('g');
   if(sb&&code){L.codeDraft=code.toUpperCase();await connect(code.toUpperCase())}
-  else render()})();
+  else render();
+  if(sb){refreshOpen();openTimer=setInterval(refreshOpen,5000)}})();
 </script>
 </body></html>
