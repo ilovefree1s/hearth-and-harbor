@@ -417,12 +417,18 @@ async function refetch(){const{data}=await sb.from('hh_games').select('state,v')
 async function mutate(fn){for(let i=0;i<6;i++){if(fn()===false){render();return false}const r=await push();if(r===true){afterChange();return true}if(r==='error')return false}return false}
 function onRemote(row){if(!row||!row.state||!G)return;if(row.v<=G.v)return;if(pushing&&row.v<=myMaxV)return;sync(G,row.state);G.v=row.v;afterChange()}
 let lastBeat=0;
+const ROOM_WAIT=60000;
+const closesIn=()=>G&&G.phase==='lobby'&&!G.joined&&G.seats.length<=1?Math.max(0,(G.created||0)+ROOM_WAIT-Date.now()):null;
+setInterval(async()=>{if(!G||G.phase!=='lobby'||G.host!==UID)return;const left=closesIn();if(left===null)return;
+  if(left<=0){await mutate(()=>{if(G.phase!=='lobby'||G.joined)return false;G.phase='closed'});goHome();L.err='Nobody joined within a minute, so the room closed.';render();return}
+  const el=document.getElementById('countdown');if(el)el.textContent=Math.ceil(left/1000)},1000);
 async function poll(){if(!CODE||pushing)return;
   if(G&&G.phase==='lobby'&&G.host===UID&&Date.now()-lastBeat>20000){lastBeat=Date.now();mutate(()=>{if(G.phase!=='lobby')return false;G.hb=Date.now()})}try{const{data}=await sb.from('hh_games').select('v').eq('id',CODE).maybeSingle();if(data&&data.v>G.v&&!pushing)await refetch()}catch(e){}
   if(G&&G.phase!=='lobby'&&isBot(P())&&G.botRunner!==ME)render()}
 function waitUntil(pred){return new Promise(res=>{if(pred())res();else waiters.push({pred,res})})}
 function checkWaiters(){waiters=waiters.filter(w=>{if(w.pred()){w.res();return false}return true})}
-function afterChange(){L.lastChange=Date.now();ME=G.players?G.players.findIndex(p=>p.uid===UID):-1;
+function afterChange(){if(G&&G.phase==='closed'){goHome();L.err='That room closed because nobody joined.';render();return}
+  L.lastChange=Date.now();ME=G.players?G.players.findIndex(p=>p.uid===UID):-1;
   if(G.phase==='lobby')L.winShown=false;
   render();checkWaiters();resume();
   if(botsShouldRun()&&!L.busy&&!L.flow)runBots();
@@ -430,6 +436,7 @@ function afterChange(){L.lastChange=Date.now();ME=G.players?G.players.findIndex(
 async function connect(code){
   const{data,error}=await sb.from('hh_games').select('state,v').eq('id',code).maybeSingle();
   if(error||!data){L.err=error?'Could not reach the game server: '+error.message:`No game found with code ${esc(code)}.`;CODE=null;history.replaceState(null,'',location.pathname);render();return false}
+  if(data.state&&data.state.phase==='closed'){L.err='That room closed because nobody joined. Tap Quick join or start a new game.';CODE=null;history.replaceState(null,'',location.pathname);render();return false}
   CODE=code;history.replaceState(null,'',location.pathname+'?g='+code);
   G=data.state;G.v=data.v;
   if(chan)sb.removeChannel(chan);
@@ -567,7 +574,7 @@ $('#lobby').addEventListener('click',async e=>{const b=e.target.closest('[data-l
   if(a==='leave'){await quitGame()}
 });
 async function createGame(n){
-  for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n}],v:1};
+  for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n}],created:Date.now(),joined:false,v:1};
     const{error}=await sb.from('hh_games').insert({id:code,state:st,v:1});
     if(!error){await connect(code);return}
     if(!String(error.code).startsWith('23')){L.err='Could not create the game: '+esc(error.message);render();return}}}
@@ -581,7 +588,7 @@ async function refreshOpen(){if(G||!sb)return;const list=await findOpen();if(G)r
     const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;render();
     if(f){const el=document.getElementById(f);if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(e){}}}}}
 async function joinSeat(){await mutate(()=>{if(G.phase!=='lobby')return false;const s=G.seats.find(s=>s.uid===UID);if(s){s.name=MYNAME;return}
-  if(G.seats.length>=4){L.err='This game already has 4 players.';return false}G.seats.push({uid:UID,name:MYNAME})})}
+  if(G.seats.length>=4){L.err='This game already has 4 players.';return false}G.seats.push({uid:UID,name:MYNAME});if(G.seats.length>1)G.joined=true})}
 function renderLobby(){const el=$('#lobby');let h;
   const err=L.err?`<div class="err">${L.err}</div>`:'';
   if(!sb)h=`<h1>Hearth &amp; Harbor</h1><p>This copy isn't connected to a game server yet. Open <b>index.html</b>, fill in <b>SUPABASE_URL</b> and <b>SUPABASE_ANON_KEY</b> near the top, and upload it again.</p>`;
@@ -602,6 +609,7 @@ function renderLobby(){const el=$('#lobby');let h;
       ${Array(bots).fill(0).map(()=>`<div class="seat bot">Computer player</div>`).join('')}</div>
     <p>Up to 4 people. Empty seats are played by the computer, and seats are drawn at random when the game starts.</p>
     ${seated?'':`<div class="lrow"><div><label for="nm">Your name</label><input id="nm" maxlength="16" value="${esc(L.nameDraft)}"></div><button class="primary" data-l="joinseat" ${G.seats.length>=4?'disabled':''}>Join</button></div>`}
+    ${host&&closesIn()!==null?`<p><b>Room closes in <span id="countdown">${Math.ceil(closesIn()/1000)}</span>s</b> if nobody joins. You can start now and play against computer players.</p>`:''}
     ${host?`<button class="primary" data-l="start">Start game · ${G.seats.length} ${G.seats.length===1?'person':'people'}${bots?` + ${bots} computer`:''}</button>`:seated?'<p><b>Waiting for the host to start…</b></p>':''}
     ${err}<button class="ghost" data-l="leave">Leave</button>`}
   el.innerHTML=`<div class="lcard">${h}${fsButton('data-l')}</div>`}
