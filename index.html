@@ -209,6 +209,8 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .ms.light{color:var(--ink);text-shadow:none}
 .ms.close{box-shadow:0 0 0 3px var(--accent),0 2px 6px rgba(0,0,0,.35)}
 .ms.cur{outline:3px solid var(--hot);outline-offset:1px}
+.endwrap{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.endwrap .sure{color:#fff;font-weight:700;font-size:13.5px;text-shadow:0 1px 3px rgba(0,0,0,.8);padding-right:4px}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -599,7 +601,9 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
   if(ME<0)return;
   if(a==='cancel'){G.offer=null;log(me,'withdrew a trade offer');render();await push();return}
   if(a==='roll'){L.flow=true;L.rolledAt=Date.now();render();try{await rollDice()}finally{L.flow=false}checkWin();render();await push();return}
-  if(a==='end'){if(Date.now()-(L.rolledAt||0)<1000)return;L.mode=null;nextTurn();G.botRunner=ME;render();await push();afterChange();return}
+  if(a==='end'){if(Date.now()-(L.rolledAt||0)<1000)return;
+    if(Date.now()-(L.endArm||0)>=3000){L.endArm=Date.now();render();clearTimeout(L.endArmT);L.endArmT=setTimeout(()=>{L.endArm=0;render()},3000);return}
+    L.endArm=0;clearTimeout(L.endArmT);L.mode=null;nextTurn();G.botRunner=ME;render();await push();afterChange();return}
   if(a.startsWith('mode-')){const m=a.slice(5);L.mode=L.mode===m?null:m;render();return}
   if(a==='buydev'){buyDev(me);checkWin();render();await push();return}
   if(a.startsWith('play-')){L.flow=true;L.mode=null;render();try{await playDev(me,a.slice(5))}finally{L.flow=false}render();return}
@@ -759,7 +763,8 @@ function renderMapCtl(spect,my,main){const el=$('#mapctl');
   const locked=Date.now()-(L.rolledAt||0)<1000;
   if(locked){clearTimeout(L.unlockT);L.unlockT=setTimeout(()=>render(),1000-(Date.now()-L.rolledAt)+30)}
   const canEnd=main&&!L.mode&&!locked;
-  el.innerHTML=`<span></span><button class="mapbtn endturn" data-act="end" ${canEnd?'':'disabled'}>End turn</button>`}
+  const armed=canEnd&&Date.now()-(L.endArm||0)<3000;
+  el.innerHTML=`<span></span><span class="endwrap">${armed?'<span class="sure">Are you sure?</span>':''}<button class="mapbtn endturn" data-act="end" ${canEnd?'':'disabled'}>End turn</button></span>`}
 function renderMapScore(){$('#mapscore').innerHTML=G.players.map(p=>{const pts=vp(p,p.i===ME),close=WIN-pts<=2;
   return `<span class="ms${p.i===3?' light':''}${close?' close':''}${G.cur===p.i&&!won()?' cur':''}" style="background:${p.color}" title="${nm(p.i)}: ${pts} points">${pts}</span>`}).join('')}
 function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
