@@ -729,7 +729,7 @@ function statusText(){const p=P();
   if(G.offer&&G.offer.from===ME)return 'Waiting for answers to your trade offer…';
   if(G.phase==='roll')return '<b>Your turn.</b> Roll the dice.';
   return 'Build, trade or play a card, then end your turn.';}
-function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor</h1><div class="status">${statusText()}</div><button class="ghost code-btn" data-act="copy" title="Copy invite link">${esc(CODE)}</button>${fsButton('data-act')}<button class="ghost" data-act="quit">${quitArm&&Date.now()-quitArm<3000?'Tap again to quit':'Quit'}</button>`}
+function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor</h1><div class="status">${statusText()}</div>${fsButton('data-act')}<button class="ghost" data-act="quit">${quitArm&&Date.now()-quitArm<3000?'Tap again to quit':'Quit'}</button>`}
 function renderMapCtl(spect,my,main){const el=$('#mapctl');
   if(spect||won()){el.innerHTML='';return}
   const canRoll=my&&G.phase==='roll'&&!L.mode,canEnd=main&&!L.mode;
