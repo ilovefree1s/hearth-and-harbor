@@ -157,11 +157,32 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .hud .code-btn{font-family:var(--display);letter-spacing:.08em}
 .botlbl{font-size:11px;font-weight:700;color:var(--muted);margin-left:4px}
 .toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:9px 14px;border-radius:8px;z-index:20;font-weight:600;max-width:calc(100% - 32px)}
+/* map corner buttons + dice belt */
+.svgbox{position:relative}
+.mapctl{position:absolute;left:0;right:0;bottom:6px;display:flex;justify-content:space-between;padding-inline:6px;pointer-events:none}
+.mapctl:empty{display:none}
+.mapbtn{pointer-events:auto;font-size:16px;padding:10px 18px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+.mapbtn:disabled{opacity:.55}
+.mapbtn.end{background:var(--panel)}
+.mapbtn.ready{animation:glow 1.4s ease-in-out infinite}
+@keyframes glow{50%{box-shadow:0 0 0 5px var(--hot),0 4px 14px rgba(0,0,0,.35)}}
+.belt{display:flex;align-items:center;gap:6px;overflow-x:auto;background:rgba(10,30,38,.55);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 8px;min-height:52px;scrollbar-width:none}
+.belt::-webkit-scrollbar{display:none}
+.belt-empty{color:rgba(237,241,234,.7);font-size:13.5px;padding-inline:4px}
+.roll-chip{flex:none;display:flex;align-items:center;gap:6px;background:var(--panel);border-radius:8px;border:2px solid var(--pc);border-left-width:7px;padding:3px 9px;height:36px;opacity:.82}
+.roll-chip b{font-family:var(--display);font-weight:800;font-size:19px;font-variant-numeric:tabular-nums;min-width:20px;text-align:center}
+.roll-chip.latest{opacity:1;height:40px;box-shadow:0 0 0 2px var(--hot)}
+.roll-chip.latest b{font-size:22px}
+.roll-chip small{font-size:12px;font-weight:700;color:var(--muted);max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.roll-chip .mini{display:flex;gap:3px}
+.roll-chip .mini .die{width:26px;height:26px}
+.roll-chip.seven b{color:#b3261e}
+@media (prefers-reduced-motion:reduce){.mapbtn.ready{animation:none}}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
 <div class="app" id="app" hidden>
-  <div class="board-wrap"><header class="hud" id="hud"></header><div id="offerbar"></div><div class="svgbox"><svg id="board" viewBox="-345 -305 690 610" aria-label="Island board"></svg></div></div>
+  <div class="board-wrap"><header class="hud" id="hud"></header><div id="offerbar"></div><div class="svgbox"><svg id="board" viewBox="-345 -305 690 610" aria-label="Island board"></svg><div class="mapctl" id="mapctl"></div></div><div class="belt" id="belt" aria-label="Recent dice rolls"></div></div>
   <aside class="panel" id="panel"></aside>
 </div>
 <div id="modal" hidden><div class="box"></div></div>
@@ -287,7 +308,7 @@ function buildSettlement(p,vid){pay(p,COST.settlement);G.verts[vid].b={p:p.i,cit
 function buildCity(p,vid){pay(p,COST.city);G.verts[vid].b.city=true;p.cities--;p.setts++;log(p,'upgraded to a city')}
 function buyDev(p){pay(p,COST.dev);const c=G.deck.pop();p.dev.push({type:c,turn:G.turn});log(p,'bought a development card',{[p.i]:`bought a development card: ${DEV[c][0]}`})}
 
-async function rollDice(){const a=1+(Math.random()*6|0),b=1+(Math.random()*6|0);G.dice=[a,b];log(P(),`rolled ${a+b}`);
+async function rollDice(){const a=1+(Math.random()*6|0),b=1+(Math.random()*6|0);G.dice=[a,b];(G.rolls=G.rolls||[]).push({p:G.cur,a,b});if(G.rolls.length>12)G.rolls.splice(0,G.rolls.length-12);log(P(),`rolled ${a+b}`);
   if(a+b===7){const need={};
     for(const p of G.players){const n=cards(p);if(n>7){const k=Math.floor(n/2);if(isBot(p)){aiDiscard(p,k);log(p,`discarded ${k} cards`)}else need[p.i]=k}}
     if(Object.keys(need).length){G.discards=need;G.phase='discard';await push();render();
@@ -550,7 +571,7 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
     else log(null,`No one accepted ${pn(me)}'s offer of ${fmt(give)} for ${fmt(get)}.`);
     render();await push()}
 };
-$('#panel').addEventListener('click',onAct);$('#hud').addEventListener('click',onAct);$('#offerbar').addEventListener('click',onAct);
+$('#panel').addEventListener('click',onAct);$('#hud').addEventListener('click',onAct);$('#offerbar').addEventListener('click',onAct);$('#mapctl').addEventListener('click',onAct);
 $('#panel').addEventListener('change',e=>{const k=e.target.dataset.ui;if(!k)return;L.ui[k]=e.target.value;render()});
 
 /* ---------- lobby ---------- */
@@ -684,6 +705,15 @@ function statusText(){const p=P();
   if(G.phase==='roll')return '<b>Your turn.</b> Roll the dice.';
   return 'Build, trade or play a card, then end your turn.';}
 function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor</h1><div class="status">${statusText()}</div><button class="ghost code-btn" data-act="copy" title="Copy invite link">${esc(CODE)}</button>${fsButton('data-act')}<button class="ghost" data-act="quit">${quitArm&&Date.now()-quitArm<3000?'Tap again to quit':'Quit'}</button>`}
+function renderMapCtl(spect,my,main){const el=$('#mapctl');
+  if(spect||won()){el.innerHTML='';return}
+  const canRoll=my&&G.phase==='roll'&&!L.mode,canEnd=main&&!L.mode;
+  el.innerHTML=`<button class="mapbtn end" data-act="end" ${canEnd?'':'disabled'}>End turn</button><button class="mapbtn roll primary${canRoll?' ready':''}" data-act="roll" ${canRoll?'':'disabled'}>Roll</button>`}
+function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
+  if(!rs.length){el.innerHTML='<span class="belt-empty">Dice rolls will show here</span>';return}
+  el.innerHTML=rs.map((r,k)=>{const p=G.players[r.p],s=r.a+r.b;
+    return `<div class="roll-chip${k===0?' latest':''}${s===7?' seven':''}" style="--pc:${p.color}" title="${nm(r.p)} rolled ${r.a} + ${r.b}">
+      ${k===0?`<span class="mini">${die(r.a)}${die(r.b)}</span>`:''}<b>${s}</b>${k===0?`<small>${nm(r.p)}</small>`:''}</div>`}).join('')}
 function renderOffer(){const o=G.offer,el=$('#offerbar');
   if(!o||won()){el.innerHTML='';return}
   const from=G.players[o.from],txt=`${o.from===ME?'You offer':'<b>'+pn(from)+'</b> offers'} <b>${fmt(o.give)}</b> for <b>${fmt(o.get)}</b>`;
@@ -697,9 +727,8 @@ function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&
   const players=`<section><h2>Players · first to ${WIN}</h2><div class="players">${G.players.map(p=>{const pts=vp(p,p.i===ME),close=WIN-pts<=2;return `<div class="pl ${G.cur===p.i&&!won()?'cur':''}"><span class="score ${p.i===3?'light':''} ${close?'close':''}" style="background:${p.color}" title="${pts} points">${pts}</span><b>${nm(p.i)}${isBot(p)?'<span class="botlbl">computer</span>':''}${G.longest===p.i?'<span class="badge">Road</span>':''}${G.army===p.i?'<span class="badge">Army</span>':''}</b><span class="togo ${close?'close':''}">${pts>=WIN?'won':(WIN-pts)+' to win'}</span>
     <span class="meta">${cards(p)} cards · ${p.dev.length} dev · ${p.knights} knights · road ${G.lens[p.i]}</span></div>`}).join('')}</div></section>`;
   const logH=`<section><h2>Log</h2><div class="log">${G.log.slice().reverse().map(l=>{const t=(l.secret&&l.secret[ME])||l.text;return l.p===null?`<div class="sys">${t}</div>`:`<div><span class="sw" style="background:${G.players[l.p].color}"></span><span><b>${nm(l.p)}</b> ${t}</span></div>`}).join('')}</div></section>`;
-  const dice=`<div class="dice-row"><div class="dice">${die(G.dice&&G.dice[0])}${die(G.dice&&G.dice[1])}<span class="sum">${s}</span></div>
-    ${spect?'':`<button class="primary" data-act="roll" ${my&&G.phase==='roll'&&!L.mode?'':'disabled'}>Roll</button>
-    <button data-act="end" ${main&&!L.mode?'':'disabled'}>End turn</button>`}</div>`;
+  const dice='';
+  renderMapCtl(spect,my,main);
   if(spect){$('#panel').innerHTML=dice+'<p class="empty">You are watching this game.</p>'+players+logH;return}
   const spots={road:G.edges.some(e=>canRoad(e.id,ME)),settlement:G.verts.some(v=>canSettle(v.id,ME,false)),city:G.verts.some(v=>canCity(v.id,ME))};
   const bOK={road:main&&afford(me,COST.road)&&me.roads>0&&spots.road,settlement:main&&afford(me,COST.settlement)&&me.setts>0&&spots.settlement,city:main&&afford(me,COST.city)&&me.cities>0&&spots.city};
@@ -731,7 +760,7 @@ function render(){
   const inGame=G&&G.phase&&G.phase!=='lobby';
   $('#app').hidden=!inGame;$('#lobby').hidden=!!inGame;
   if(!inGame){if(!M.hidden)closeModal();renderLobby();return}
-  renderBoard();renderHud();renderOffer();renderPanel();
+  renderBoard();renderHud();renderOffer();renderPanel();renderBelt();
   if(won()&&!L.winShown)showWin();
   if(G.discards&&G.discards[ME]&&!L.discarding&&!won())promptDiscard()}
 
