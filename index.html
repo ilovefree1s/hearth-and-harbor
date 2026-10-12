@@ -1,9 +1,17 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Hearth & Harbor</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="theme-color" content="#1f5262">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hearth & Harbor">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700;800&family=Alegreya+Sans:wght@400;500;700;800&display=swap">
-<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}[hidden]{display:none!important}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:#1f5262}</style>
 <style>
 /* Layout: the island fills the sea on the left; a sea-glass ledger column on the right holds dice, hand, builds, trades and the log. */
 :root{
@@ -472,10 +480,24 @@ function onTile(id){if(hotTiles().has(id)&&L.robberResolve){const r=L.robberReso
 $('#board').addEventListener('click',e=>{const t=e.target.closest('[data-v],[data-e],[data-t]');if(!t)return;
   if(t.dataset.v)onVertex(+t.dataset.v);else if(t.dataset.e)onEdge(+t.dataset.e);else onTile(+t.dataset.t)});
 
+/* full screen: real Fullscreen API where it exists; on iPhone, explain Add to Home Screen */
+const isStandalone=()=>navigator.standalone===true||(window.matchMedia&&(matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches));
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
+const fsSupported=()=>!!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen);
+const isIOS=()=>/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+function fsButton(attr){if(isStandalone())return '';return `<button class="ghost" ${attr}="fs" title="Full screen" aria-label="${fsEl()?'Exit full screen':'Full screen'}">${fsEl()?'Exit full screen':'Full screen'}</button>`}
+async function toggleFullscreen(){
+  if(fsEl()){try{await (document.exitFullscreen||document.webkitExitFullscreen).call(document)}catch(e){}return}
+  if(fsSupported()&&!isIOS()){const d=document.documentElement;try{await (d.requestFullscreen||d.webkitRequestFullscreen).call(d,{navigationUI:'hide'})}catch(e){toast('Your browser blocked full screen.')}return}
+  modal(`<h3>Play full screen on iPhone</h3><p>iPhones don't let websites go full screen, but you can add the game to your home screen and it opens with no browser bars:</p>
+    <p>1. Tap the <b>Share</b> button (the square with an arrow) at the bottom of Safari.<br>2. Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.<br>3. Open <b>Hearth &amp; Harbor</b> from your home screen.</p>
+    <div class="opts"><button class="primary" data-c="ok">Got it</button></div>`,b=>{if(b.dataset.c)closeModal()})}
+document.addEventListener('fullscreenchange',()=>render());document.addEventListener('webkitfullscreenchange',()=>render());
 function copyLink(){const url=location.origin+location.pathname+'?g='+CODE;
   try{navigator.clipboard.writeText(url).then(()=>toast('Invite link copied'),()=>toast(url))}catch(e){toast(url)}}
 const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)return;const a=b.dataset.act,me=G.players[ME];
   if(a==='copy'){copyLink();return}
+  if(a==='fs'){toggleFullscreen();return}
   if(a==='takeover'){await mutate(()=>{G.botRunner=ME});return}
   if(a==='accept'||a==='decline'){const id=b.dataset.id;
     if(a==='accept')await mutate(()=>{const o=G.offer;if(!o||o.id!==id)return false;const from=G.players[o.from],to=G.players[ME];
@@ -522,6 +544,7 @@ $('#lobby').addEventListener('click',async e=>{const b=e.target.closest('[data-l
   if(a==='joinseat'){if(!setName())return;await joinSeat();return}
   if(a==='start'){await mutate(()=>{if(G.phase!=='lobby'||G.host!==UID)return false;const ng=buildGame(G.seats,G.host);ng.v=G.v;sync(G,ng)});return}
   if(a==='copy'){copyLink();return}
+  if(a==='fs'){toggleFullscreen();return}
   if(a==='leave'){CODE=null;G=null;ME=-1;clearInterval(pollTimer);if(chan){sb.removeChannel(chan);chan=null}history.replaceState(null,'',location.pathname);render()}
 });
 async function createGame(n){
@@ -562,7 +585,7 @@ function renderLobby(){const el=$('#lobby');let h;
     ${seated?'':`<div class="lrow"><div><label for="nm">Your name</label><input id="nm" maxlength="16" value="${esc(L.nameDraft)}"></div><button class="primary" data-l="joinseat" ${G.seats.length>=4?'disabled':''}>Join</button></div>`}
     ${host?`<button class="primary" data-l="start">Start game · ${G.seats.length} ${G.seats.length===1?'person':'people'}${bots?` + ${bots} computer`:''}</button>`:seated?'<p><b>Waiting for the host to start…</b></p>':''}
     ${err}<button class="ghost" data-l="leave">Leave</button>`}
-  el.innerHTML=`<div class="lcard">${h}</div>`}
+  el.innerHTML=`<div class="lcard">${h}${fsButton('data-l')}</div>`}
 
 /* ---------- modals ---------- */
 const M=$('#modal');let mH=null;
@@ -633,7 +656,7 @@ function statusText(){const p=P();
   if(G.offer&&G.offer.from===ME)return 'Waiting for answers to your trade offer…';
   if(G.phase==='roll')return '<b>Your turn.</b> Roll the dice.';
   return 'Build, trade or play a card, then end your turn.';}
-function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor</h1><div class="status">${statusText()}</div><button class="ghost code-btn" data-act="copy" title="Copy invite link">${esc(CODE)}</button>`}
+function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor</h1><div class="status">${statusText()}</div><button class="ghost code-btn" data-act="copy" title="Copy invite link">${esc(CODE)}</button>${fsButton('data-act')}`}
 function renderOffer(){const o=G.offer,el=$('#offerbar');
   if(!o||won()){el.innerHTML='';return}
   const from=G.players[o.from],txt=`${o.from===ME?'You offer':'<b>'+pn(from)+'</b> offers'} <b>${fmt(o.give)}</b> for <b>${fmt(o.get)}</b>`;
