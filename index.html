@@ -186,6 +186,9 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 #turnflash.go{animation:flash 1.1s ease-out forwards}
 @keyframes flash{0%{opacity:0;transform:scaleY(.4)}12%{opacity:1;transform:scaleY(1)}75%{opacity:1}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){#turnflash.go{animation:flashfade 1.1s linear forwards}@keyframes flashfade{0%,80%{opacity:1}100%{opacity:0}}}
+/* confirmations that need the map visible sit at the bottom */
+#modal.low{align-items:flex-end;background:rgba(15,30,36,.25);padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+#modal.low .box{max-width:460px}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -331,7 +334,7 @@ async function moveRobber(){const p=P();let ti;G.phase='robber';await push();
       const who=[...new Set(t.v.map(v=>G.verts[v].b).filter(Boolean).map(b=>b.p))].map(i=>`<span class="chip${i===3?' light':''}" style="background:${G.players[i].color}">${nm(i)} · ${cards(G.players[i])} cards</span>`);
       L.robberPreview=ti;render();
       const ok=await chooseModal('Move the robber here?',`${TILE[t.type].name}${t.num?' ('+t.num+')':''}. ${who.length?'<br>On this tile: '+who.join(' '):'<br>No one has a building on this tile.'}`,
-        [{label:'Move robber',value:true},{label:'Pick another tile',value:false}]);
+        [{label:'Move robber',value:true},{label:'Pick another tile',value:false}],true);
       L.robberPreview=null;if(ok)break;render()}
     L.mode=null}
   else{ti=aiRobberHex(p.i);await sleep(450)}
@@ -506,8 +509,20 @@ function hotVerts(){const s=new Set();if(!myTurn())return s;
 function hotEdges(){const s=new Set();if(!myTurn())return s;
   if((G.phase==='setup'&&G.sub==='road')||L.mode==='road'||L.mode==='freeRoad')G.edges.forEach(e=>{if(canRoad(e.id,ME))s.add(e.id)});return s}
 function hotTiles(){const s=new Set();if(L.mode==='robber'&&myTurn())G.tiles.forEach((t,i)=>{if(i!==G.robber)s.add(i)});return s}
+function setupSpotInfo(id){const v=G.verts[id],second=G.setupIdx>=4;
+  const tiles=v.hexes.map(ti=>G.tiles[ti]);
+  const touch=tiles.map(t=>`<span class="chip${t.type==='desert'?' light':''}" style="background:${TILE[t.type].fill}">${t.type==='desert'?'Dunes':RN[t.type]}${t.num?' · '+t.num:''}</span>`).join(' ');
+  let txt=`<b>Touches:</b><br>${touch}`;
+  if(v.port)txt+=`<br><b>Harbor:</b> ${v.port==='any'?'trade any 3 for 1':'trade 2 '+RN[v.port]+' for 1'}`;
+  if(second){const g={};tiles.forEach(t=>{if(t.type!=='desert')g[t.type]=(g[t.type]||0)+1});
+    txt+=`<br><br><b>You'll get right away:</b> ${fmt(g)||'nothing (only Dunes here)'}`}
+  return txt}
 async function onVertex(id){const me=G.players[ME];if(!hotVerts().has(id))return;
-  if(G.phase==='setup'){placeSetupSettlement(ME,id);render();await push();return}
+  if(G.phase==='setup'){
+    if(L.confirming)return;L.confirming=true;L.vertPreview=id;render();
+    const ok=await chooseModal(`Place your ${G.setupIdx>=4?'second':'first'} settlement here?`,setupSpotInfo(id),[{label:'Place settlement',value:true},{label:'Pick another spot',value:false}],true);
+    L.confirming=false;L.vertPreview=null;
+    if(!ok||!hotVerts().has(id)){render();return}placeSetupSettlement(ME,id);render();await push();return}
   if(L.mode==='settlement')buildSettlement(me,id);else if(L.mode==='city')buildCity(me,id);
   L.mode=null;checkWin();render();await push()}
 async function onEdge(id){const me=G.players[ME];if(!hotEdges().has(id))return;
@@ -647,11 +662,11 @@ function renderLobby(){const el=$('#lobby');let h;
 /* ---------- modals ---------- */
 const M=$('#modal');let mH=null;
 M.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&mH&&!b.disabled)mH(b)});
-function modal(html,h){M.querySelector('.box').innerHTML=html;M.hidden=false;mH=h;const f=M.querySelector('button:not(:disabled)');if(f)f.focus()}
+function modal(html,h,low){M.classList.toggle('low',!!low);M.querySelector('.box').innerHTML=html;M.hidden=false;mH=h;const f=M.querySelector('button:not(:disabled)');if(f)f.focus()}
 function closeModal(){M.hidden=true;mH=null}
-function chooseModal(title,text,opts){return new Promise(res=>{
+function chooseModal(title,text,opts,low){return new Promise(res=>{
   modal(`<h3>${title}</h3><p>${text}</p><div class="opts">${opts.map((o,i)=>`<button data-c="${i}">${o.color?`<span class="sw" style="background:${o.color};width:14px;height:14px;margin-right:6px;vertical-align:-2px"></span>`:''}${o.label}</button>`).join('')}</div>`,
-    b=>{if(b.dataset.c===undefined)return;closeModal();res(opts[+b.dataset.c].value)})})}
+    b=>{if(b.dataset.c===undefined)return;closeModal();res(opts[+b.dataset.c].value)},low)})}
 function discardModal(k){return new Promise(res=>{const sel=z();
   const draw=()=>{const me=G.players[ME],tot=RES.reduce((s,r)=>s+sel[r],0);
     modal(`<h3>Discard ${k} cards</h3><p>A 7 was rolled and you hold more than 7 cards.</p>
@@ -693,6 +708,7 @@ function renderBoard(){const hv=hotVerts(),he=hotEdges(),ht=hotTiles();let s=PAT
     s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hot-e pulse"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hit" stroke-width="18" data-e="${id}"><title>Build a road here</title></line>`});
   G.verts.forEach(v=>{if(!v.b)return;const c=G.players[v.b.p].color;
     s+=`<path transform="translate(${v.x.toFixed(1)},${v.y.toFixed(1)})" d="${v.b.city?'M-12 8V-4L-5-10L2-4V-1H12V8Z':'M-8 6V-3L0-10L8-3V6Z'}" fill="${c}" stroke="#1d1a17" stroke-width="2" stroke-linejoin="round"/>`});
+  if(L.vertPreview!=null){const v=G.verts[L.vertPreview];s+=`<circle cx="${v.x}" cy="${v.y}" r="13" fill="var(--hot)" stroke="#1d2a2f" stroke-width="3"/>`}
   hv.forEach(id=>{const v=G.verts[id];s+=`<circle cx="${v.x}" cy="${v.y}" r="${L.mode==='city'?14:8}" class="hot-v pulse" ${L.mode==='city'?'fill-opacity=".35"':''}/><circle cx="${v.x}" cy="${v.y}" r="16" class="hit" data-v="${id}"><title>${L.mode==='city'?'Upgrade to a city':'Build a settlement here'}</title></circle>`});
   $('#board').innerHTML=s}
 function die(n){if(!n)return `<svg class="die blank" viewBox="0 0 40 40"><rect x="1" y="1" width="38" height="38" rx="8"/></svg>`;
