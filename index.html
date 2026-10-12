@@ -202,11 +202,18 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .meta{font-size:12.5px}
 .togo{font-size:12px}
 .mapbtn.endturn{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+/* mini scoreboard in the water, top-left of the map */
+.mapscore{position:absolute;top:6px;left:6px;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.ms{width:26px;height:26px;border-radius:6px;border:2px solid rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4);box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.ms.light{color:var(--ink);text-shadow:none}
+.ms.close{box-shadow:0 0 0 3px var(--accent),0 2px 6px rgba(0,0,0,.35)}
+.ms.cur{outline:3px solid var(--hot);outline-offset:1px}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
 <div class="app" id="app" hidden>
-  <div class="board-wrap"><header class="hud" id="hud"></header><div id="offerbar"></div><div class="svgbox"><svg id="board" viewBox="-345 -305 690 610" aria-label="Island board"></svg><div class="mapctl" id="mapctl"></div></div><div class="belt" id="belt" aria-label="Recent dice rolls"></div></div>
+  <div class="board-wrap"><header class="hud" id="hud"></header><div id="offerbar"></div><div class="svgbox"><svg id="board" viewBox="-345 -305 690 610" aria-label="Island board"></svg><div class="mapscore" id="mapscore"></div><div class="mapctl" id="mapctl"></div></div><div class="belt" id="belt" aria-label="Recent dice rolls"></div></div>
   <aside class="panel" id="panel"></aside>
 </div>
 <div id="modal" hidden><div class="box"></div></div>
@@ -753,6 +760,8 @@ function renderMapCtl(spect,my,main){const el=$('#mapctl');
   if(locked){clearTimeout(L.unlockT);L.unlockT=setTimeout(()=>render(),1000-(Date.now()-L.rolledAt)+30)}
   const canEnd=main&&!L.mode&&!locked;
   el.innerHTML=`<span></span><button class="mapbtn endturn" data-act="end" ${canEnd?'':'disabled'}>End turn</button>`}
+function renderMapScore(){$('#mapscore').innerHTML=G.players.map(p=>{const pts=vp(p,p.i===ME),close=WIN-pts<=2;
+  return `<span class="ms${p.i===3?' light':''}${close?' close':''}${G.cur===p.i&&!won()?' cur':''}" style="background:${p.color}" title="${nm(p.i)}: ${pts} points">${pts}</span>`}).join('')}
 function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
   if(!rs.length){el.innerHTML='<span class="belt-empty">Dice rolls will show here</span>';return}
   el.innerHTML=rs.map((r,k)=>{const p=G.players[r.p],s=r.a+r.b;
@@ -793,13 +802,13 @@ function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&
   const opt=k=>RES.map(r=>`<option value="${r}" ${u[k]===r?'selected':''}>${RN[r]}</option>`).join('');
   $('#panel').innerHTML=dice+`
   <section><h2>Your hand</h2><div class="hand">${RES.map(r=>`<div class="card ${me.res[r]?'':'zero'}" style="background:${TILE[r].fill}"><div class="n">${me.res[r]}</div><div class="l">${RN[r]}</div></div>`).join('')}</div></section>
-  `+players+`
   <section><h2>Build</h2><div class="builds">
     <button data-act="mode-road" class="${L.mode==='road'?'active':''}" ${bOK.road||L.mode==='road'?'':'disabled'}>Road · ${me.roads} left${costChips(COST.road)}</button>
     <button data-act="mode-settlement" class="${L.mode==='settlement'?'active':''}" ${bOK.settlement||L.mode==='settlement'?'':'disabled'}>Settlement · 1 pt${costChips(COST.settlement)}</button>
     <button data-act="mode-city" class="${L.mode==='city'?'active':''}" ${bOK.city||L.mode==='city'?'':'disabled'}>City · 2 pts${costChips(COST.city)}</button>
     <button data-act="buydev" ${main&&!L.mode&&afford(me,COST.dev)&&G.deck.length?'':'disabled'}>Dev card · ${G.deck.length} left${costChips(COST.dev)}</button>
   </div></section>
+  `+players+`
   <section><h2>Development cards</h2><div class="devs">${devHtml}</div></section>
   <section><h2>Trade</h2><div class="trade">
     <div class="trow"><span class="lbl">Bank</span><select id="bg" data-ui="bg" aria-label="Give to bank">${opt('bg')}</select><span>×${bk} →</span><select id="bt" data-ui="bt" aria-label="Get from bank">${opt('bt')}</select>
@@ -815,7 +824,7 @@ function render(){
   const inGame=G&&G.phase&&G.phase!=='lobby';
   $('#app').hidden=!inGame;$('#lobby').hidden=!!inGame;
   if(!inGame){if(!M.hidden)closeModal();renderLobby();return}
-  renderBoard();renderHud();renderOffer();renderPanel();renderBelt();turnFlash();
+  renderBoard();renderHud();renderOffer();renderPanel();renderBelt();renderMapScore();turnFlash();
   if(won()&&!L.winShown)showWin();
   if(G.discards&&G.discards[ME]&&!L.discarding&&!won())promptDiscard()}
 
