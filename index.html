@@ -772,8 +772,9 @@ function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&
     return `<div class="dev"><div><b>${DEV[t][0]}${g.n>1?' ×'+g.n:''}</b><small>${DEV[t][1]}${t!=='vp'&&g.ready<g.n?' New cards play next turn.':''}</small></div>${t==='vp'?'':`<button data-act="play-${t}" ${can?'':'disabled'}>Play</button>`}</div>`}).join(''):'<div class="empty">No development cards yet. They cost one Wool, Grain and Ore.</div>';
   const u=L.ui,bk=rate(ME,u.bg);
   const opt=k=>RES.map(r=>`<option value="${r}" ${u[k]===r?'selected':''}>${RN[r]}</option>`).join('');
-  $('#panel').innerHTML=dice+players+`
+  $('#panel').innerHTML=dice+`
   <section><h2>Your hand</h2><div class="hand">${RES.map(r=>`<div class="card ${me.res[r]?'':'zero'}" style="background:${TILE[r].fill}"><div class="n">${me.res[r]}</div><div class="l">${RN[r]}</div></div>`).join('')}</div></section>
+  `+players+`
   <section><h2>Build</h2><div class="builds">
     <button data-act="mode-road" class="${L.mode==='road'?'active':''}" ${bOK.road||L.mode==='road'?'':'disabled'}>Road · ${me.roads} left${costChips(COST.road)}</button>
     <button data-act="mode-settlement" class="${L.mode==='settlement'?'active':''}" ${bOK.settlement||L.mode==='settlement'?'':'disabled'}>Settlement · 1 pt${costChips(COST.settlement)}</button>
