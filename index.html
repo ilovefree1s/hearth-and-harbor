@@ -201,6 +201,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .pl b{font-size:14.5px}
 .meta{font-size:12.5px}
 .togo{font-size:12px}
+.mapbtn.endturn{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -590,8 +591,8 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
     return}
   if(ME<0)return;
   if(a==='cancel'){G.offer=null;log(me,'withdrew a trade offer');render();await push();return}
-  if(a==='roll'){L.flow=true;render();try{await rollDice()}finally{L.flow=false}checkWin();render();await push();return}
-  if(a==='end'){L.mode=null;nextTurn();G.botRunner=ME;render();await push();afterChange();return}
+  if(a==='roll'){L.flow=true;L.rolledAt=Date.now();render();try{await rollDice()}finally{L.flow=false}checkWin();render();await push();return}
+  if(a==='end'){if(Date.now()-(L.rolledAt||0)<1000)return;L.mode=null;nextTurn();G.botRunner=ME;render();await push();afterChange();return}
   if(a.startsWith('mode-')){const m=a.slice(5);L.mode=L.mode===m?null:m;render();return}
   if(a==='buydev'){buyDev(me);checkWin();render();await push();return}
   if(a.startsWith('play-')){L.flow=true;L.mode=null;render();try{await playDev(me,a.slice(5))}finally{L.flow=false}render();return}
@@ -744,8 +745,14 @@ function statusText(){const p=P();
 function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor</h1><div class="status">${statusText()}</div>${fsButton('data-act')}<button class="ghost" data-act="quit">${quitArm&&Date.now()-quitArm<3000?'Tap again to quit':'Quit'}</button>`}
 function renderMapCtl(spect,my,main){const el=$('#mapctl');
   if(spect||won()){el.innerHTML='';return}
-  const canRoll=my&&G.phase==='roll'&&!L.mode,canEnd=main&&!L.mode;
-  el.innerHTML=`<button class="mapbtn end" data-act="end" ${canEnd?'':'disabled'}>End turn</button><button class="mapbtn roll primary${canRoll?' ready':''}" data-act="roll" ${canRoll?'':'disabled'}>Roll</button>`}
+  if(ME<0||G.cur!==ME||G.phase==='setup'){el.innerHTML='';return}
+  const rolling=G.phase==='roll'||G.phase==='discard'||G.phase==='robber'||!G.dice;
+  if(rolling){const canRoll=my&&G.phase==='roll'&&!L.mode;
+    el.innerHTML=`<span></span><button class="mapbtn roll primary${canRoll?' ready':''}" data-act="roll" ${canRoll?'':'disabled'}>Roll</button>`;return}
+  const locked=Date.now()-(L.rolledAt||0)<1000;
+  if(locked){clearTimeout(L.unlockT);L.unlockT=setTimeout(()=>render(),1000-(Date.now()-L.rolledAt)+30)}
+  const canEnd=main&&!L.mode&&!locked;
+  el.innerHTML=`<span></span><button class="mapbtn endturn" data-act="end" ${canEnd?'':'disabled'}>End turn</button>`}
 function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
   if(!rs.length){el.innerHTML='<span class="belt-empty">Dice rolls will show here</span>';return}
   el.innerHTML=rs.map((r,k)=>{const p=G.players[r.p],s=r.a+r.b;
