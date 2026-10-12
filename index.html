@@ -178,6 +178,14 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .roll-chip .mini .die{width:26px;height:26px}
 .roll-chip.seven b{color:#b3261e}
 @media (prefers-reduced-motion:reduce){.mapbtn.ready{animation:none}}
+/* your-turn banner */
+#turnflash{position:fixed;left:0;right:0;top:38%;z-index:30;pointer-events:none;text-align:center;
+  background:var(--pc);color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35);font-family:var(--display);font-weight:800;font-size:clamp(28px,8vw,52px);
+  padding-block:18px;border-top:3px solid rgba(0,0,0,.35);border-bottom:3px solid rgba(0,0,0,.35);box-shadow:0 10px 40px rgba(0,0,0,.45);opacity:0}
+#turnflash.light{color:var(--ink);text-shadow:none}
+#turnflash.go{animation:flash 1.1s ease-out forwards}
+@keyframes flash{0%{opacity:0;transform:scaleY(.4)}12%{opacity:1;transform:scaleY(1)}75%{opacity:1}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){#turnflash.go{animation:flashfade 1.1s linear forwards}@keyframes flashfade{0%,80%{opacity:1}100%{opacity:0}}}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -187,6 +195,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 </div>
 <div id="modal" hidden><div class="box"></div></div>
 <div id="toast" class="toast" hidden></div>
+<div id="turnflash" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
@@ -714,6 +723,16 @@ function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
   el.innerHTML=rs.map((r,k)=>{const p=G.players[r.p],s=r.a+r.b;
     return `<div class="roll-chip${k===0?' latest':''}${s===7?' seven':''}" style="--pc:${p.color}" title="${nm(r.p)} rolled ${r.a} + ${r.b}">
       ${k===0?`<span class="mini">${die(r.a)}${die(r.b)}</span>`:''}<b>${s}</b>${k===0?`<small>${nm(r.p)}</small>`:''}</div>`}).join('')}
+/* a 1-second banner in your color when your turn starts */
+let flashT=null;
+function turnFlash(){if(ME<0||won()||G.cur!==ME)return;
+  const key=G.phase==='setup'?(G.sub==='settlement'?'s'+G.setupIdx:null):(G.phase==='roll'?'t'+G.turn:null);
+  if(!key||key===L.flashKey)return;L.flashKey=key;
+  const el=$('#turnflash'),p=G.players[ME];
+  el.textContent=G.phase==='setup'?'Your turn · place a settlement':'Your turn';
+  el.style.setProperty('--pc',p.color);el.classList.toggle('light',ME===3);
+  el.hidden=false;el.classList.remove('go');void el.offsetWidth;el.classList.add('go');
+  clearTimeout(flashT);flashT=setTimeout(()=>{el.hidden=true;el.classList.remove('go')},1100)}
 function renderOffer(){const o=G.offer,el=$('#offerbar');
   if(!o||won()){el.innerHTML='';return}
   const from=G.players[o.from],txt=`${o.from===ME?'You offer':'<b>'+pn(from)+'</b> offers'} <b>${fmt(o.give)}</b> for <b>${fmt(o.get)}</b>`;
@@ -760,7 +779,7 @@ function render(){
   const inGame=G&&G.phase&&G.phase!=='lobby';
   $('#app').hidden=!inGame;$('#lobby').hidden=!!inGame;
   if(!inGame){if(!M.hidden)closeModal();renderLobby();return}
-  renderBoard();renderHud();renderOffer();renderPanel();renderBelt();
+  renderBoard();renderHud();renderOffer();renderPanel();renderBelt();turnFlash();
   if(won()&&!L.winShown)showWin();
   if(G.discards&&G.discards[ME]&&!L.discarding&&!won())promptDiscard()}
 
