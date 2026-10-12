@@ -203,7 +203,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .togo{font-size:12px}
 .mapbtn.endturn{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 /* mini scoreboard in the water, top-left of the map */
-.mapscore{position:absolute;top:6px;left:6px;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.mapscore{position:absolute;top:6px;left:6px;display:grid;grid-template-columns:repeat(2,26px);gap:5px;pointer-events:none}
 .ms{width:26px;height:26px;border-radius:6px;border:2px solid rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;
   font-family:var(--display);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4);box-shadow:0 2px 6px rgba(0,0,0,.35)}
 .ms.light{color:var(--ink);text-shadow:none}
