@@ -211,6 +211,12 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .ms.cur{outline:3px solid var(--hot);outline-offset:1px}
 .endwrap{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .endwrap .sure{color:#fff;font-weight:700;font-size:13.5px;text-shadow:0 1px 3px rgba(0,0,0,.8);padding-right:4px}
+/* road spots: bright yellow on a black outline so they stand out on any tile */
+.hot-e-bg{stroke:#111;stroke-width:13;stroke-linecap:round;pointer-events:none}
+.hot-e{stroke:#ffe14d!important;stroke-width:7!important;stroke-dasharray:none!important;stroke-linecap:round;pointer-events:none}
+.epulse{animation:epulse 1s ease-in-out infinite}
+@keyframes epulse{50%{stroke:#fffbe0}}
+@media (prefers-reduced-motion:reduce){.epulse{animation:none}}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -729,7 +735,7 @@ function renderBoard(){const hv=hotVerts(),he=hotEdges(),ht=hotTiles();let s=PAT
   G.edges.forEach(e=>{if(e.road===null)return;const A=G.verts[e.a],B=G.verts[e.b],x1=A.x+(B.x-A.x)*.14,y1=A.y+(B.y-A.y)*.14,x2=B.x-(B.x-A.x)*.14,y2=B.y-(B.y-A.y)*.14;
     s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#1d1a17" stroke-width="10" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${G.players[e.road].color}" stroke-width="6" stroke-linecap="round"/>`});
   he.forEach(id=>{const e=G.edges[id],A=G.verts[e.a],B=G.verts[e.b],x1=A.x+(B.x-A.x)*.18,y1=A.y+(B.y-A.y)*.18,x2=B.x-(B.x-A.x)*.18,y2=B.y-(B.y-A.y)*.18;
-    s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hot-e pulse"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hit" stroke-width="18" data-e="${id}"><title>Build a road here</title></line>`});
+    s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hot-e-bg"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hot-e epulse"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hit" stroke-width="18" data-e="${id}"><title>Build a road here</title></line>`});
   G.verts.forEach(v=>{if(!v.b)return;const c=G.players[v.b.p].color;
     s+=`<path transform="translate(${v.x.toFixed(1)},${v.y.toFixed(1)})" d="${v.b.city?'M-12 8V-4L-5-10L2-4V-1H12V8Z':'M-8 6V-3L0-10L8-3V6Z'}" fill="${c}" stroke="#1d1a17" stroke-width="2" stroke-linejoin="round"/>`});
   if(L.vertPreview!=null){const v=G.verts[L.vertPreview];s+=`<circle cx="${v.x}" cy="${v.y}" r="13" fill="var(--hot)" stroke="#1d2a2f" stroke-width="3"/>`}
