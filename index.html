@@ -416,7 +416,9 @@ async function refetch(){const{data}=await sb.from('hh_games').select('state,v')
   if(data&&data.v>=G.v){sync(G,data.state);G.v=data.v;afterChange()}}
 async function mutate(fn){for(let i=0;i<6;i++){if(fn()===false){render();return false}const r=await push();if(r===true){afterChange();return true}if(r==='error')return false}return false}
 function onRemote(row){if(!row||!row.state||!G)return;if(row.v<=G.v)return;if(pushing&&row.v<=myMaxV)return;sync(G,row.state);G.v=row.v;afterChange()}
-async function poll(){if(!CODE||pushing)return;try{const{data}=await sb.from('hh_games').select('v').eq('id',CODE).maybeSingle();if(data&&data.v>G.v&&!pushing)await refetch()}catch(e){}
+let lastBeat=0;
+async function poll(){if(!CODE||pushing)return;
+  if(G&&G.phase==='lobby'&&G.host===UID&&Date.now()-lastBeat>20000){lastBeat=Date.now();mutate(()=>{if(G.phase!=='lobby')return false;G.hb=Date.now()})}try{const{data}=await sb.from('hh_games').select('v').eq('id',CODE).maybeSingle();if(data&&data.v>G.v&&!pushing)await refetch()}catch(e){}
   if(G&&G.phase!=='lobby'&&isBot(P())&&G.botRunner!==ME)render()}
 function waitUntil(pred){return new Promise(res=>{if(pred())res();else waiters.push({pred,res})})}
 function checkWaiters(){waiters=waiters.filter(w=>{if(w.pred()){w.res();return false}return true})}
@@ -432,7 +434,7 @@ async function connect(code){
   G=data.state;G.v=data.v;
   if(chan)sb.removeChannel(chan);
   chan=sb.channel('game-'+code).on('postgres_changes',{event:'UPDATE',schema:'public',table:'hh_games',filter:'id=eq.'+code},pl=>onRemote(pl.new)).subscribe();
-  clearInterval(pollTimer);pollTimer=setInterval(poll,4000);
+  clearInterval(pollTimer);pollTimer=setInterval(poll,4000);lastBeat=Date.now();
   afterChange();return true}
 
 /* pick up an unfinished robber move or free roads after a reload */
@@ -569,10 +571,10 @@ async function createGame(n){
     const{error}=await sb.from('hh_games').insert({id:code,state:st,v:1});
     if(!error){await connect(code);return}
     if(!String(error.code).startsWith('23')){L.err='Could not create the game: '+esc(error.message);render();return}}}
-/* open games: lobbies touched in the last 30 minutes with a free seat */
-async function findOpen(){try{const since=new Date(Date.now()-30*60*1000).toISOString();
+/* open games: waiting rooms whose host checked in within the last minute, with 1–3 people */
+async function findOpen(){try{const since=new Date(Date.now()-60*1000).toISOString();
   const{data,error}=await sb.from('hh_games').select('id,state,updated_at').eq('state->>phase','lobby').gte('updated_at',since).order('updated_at',{ascending:false}).limit(10);
-  if(error)return [];return (data||[]).filter(r=>Array.isArray(r.state.seats)&&r.state.seats.length<4)}catch(e){return []}}
+  if(error)return [];return (data||[]).filter(r=>Array.isArray(r.state.seats)&&r.state.seats.length>=1&&r.state.seats.length<4)}catch(e){return []}}
 let openTimer=null;
 async function refreshOpen(){if(G||!sb)return;const list=await findOpen();if(G)return;
   const sig=JSON.stringify(list.map(r=>[r.id,r.state.seats.length]));if(sig!==L.openSig){L.open=list;L.openSig=sig;
@@ -588,7 +590,7 @@ function renderLobby(){const el=$('#lobby');let h;
     <button class="primary" data-l="quick">Quick join</button>
     <p style="font-size:13px;margin-top:-6px">Jumps into a game that's waiting for players, or starts a new one if none is open.</p>
     ${L.open&&L.open.length?`<div><label>Open games</label><div class="seats">${L.open.map(r=>{const host=r.state.seats.find(s=>s.uid===r.state.host)||r.state.seats[0];
-      return `<div class="seat"><b>${esc(host?host.name:'Someone')}'s game</b><span class="tag" style="margin-left:6px">${r.state.seats.length} of 4</span><button style="margin-left:auto" data-l="openjoin" data-id="${esc(r.id)}">Join</button></div>`}).join('')}</div></div>`:'<p style="font-size:13px">No open games right now.</p>'}
+      const mine=r.state.seats.some(s=>s.uid===UID);return `<div class="seat"><b>${esc(host?host.name:'Someone')}'s game</b>${mine?' <span class="tag" style="margin-left:6px">You\'re in this one</span>':''}<span class="tag" style="margin-left:6px">${r.state.seats.length} of 4</span><button style="margin-left:auto" data-l="openjoin" data-id="${esc(r.id)}">Join</button></div>`}).join('')}</div></div>`:'<p style="font-size:13px">No open games right now.</p>'}
     <div class="or">or</div>
     <button data-l="create">Start a new game</button>
     <div class="or">join with a code</div>
