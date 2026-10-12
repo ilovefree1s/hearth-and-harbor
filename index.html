@@ -493,11 +493,28 @@ async function toggleFullscreen(){
     <p>1. Tap the <b>Share</b> button (the square with an arrow) at the bottom of Safari.<br>2. Scroll down and tap <b>Add to Home Screen</b>, then <b>Add</b>.<br>3. Open <b>Hearth &amp; Harbor</b> from your home screen.</p>
     <div class="opts"><button class="primary" data-c="ok">Got it</button></div>`,b=>{if(b.dataset.c)closeModal()})}
 document.addEventListener('fullscreenchange',()=>render());document.addEventListener('webkitfullscreenchange',()=>render());
+/* quitting: your seat goes to a computer player so the others can keep going */
+let quitArm=0,quitTimer=null;
+function goHome(){CODE=null;G=null;ME=-1;L.mode=null;L.flow=false;L.winShown=false;L.robberResolve=null;closeModal();clearInterval(pollTimer);if(chan){sb.removeChannel(chan);chan=null}
+  history.replaceState(null,'',location.pathname);L.openSig='';render();refreshOpen()}
+async function quitGame(){
+  if(G&&G.players&&ME>=0&&!won()){const seat=ME;
+    await mutate(()=>{const p=G.players[seat];if(!p||p.uid!==UID)return false;
+      p.kind='bot';p.uid=null;log(p,'left the game. A computer player took over.');
+      if(G.discards&&G.discards[seat]){aiDiscard(p,G.discards[seat]);delete G.discards[seat]}
+      if(G.offer){if(G.offer.from===seat)G.offer=null;else if(G.offer.to.includes(seat)&&!G.offer.declined.includes(seat))G.offer.declined.push(seat)}
+      if(G.cur===seat&&G.freeRoads)G.freeRoads=0;
+      if(G.botRunner===seat){const other=G.players.find(q=>!isBot(q));G.botRunner=other?other.i:-1}})}
+  else if(G&&G.phase==='lobby'){await mutate(()=>{if(G.phase!=='lobby')return false;const i=G.seats.findIndex(s=>s.uid===UID);if(i<0)return;G.seats.splice(i,1);
+    if(G.host===UID&&G.seats.length)G.host=G.seats[0].uid})}
+  goHome()}
 function copyLink(){const url=location.origin+location.pathname+'?g='+CODE;
   try{navigator.clipboard.writeText(url).then(()=>toast('Invite link copied'),()=>toast(url))}catch(e){toast(url)}}
 const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)return;const a=b.dataset.act,me=G.players[ME];
   if(a==='copy'){copyLink();return}
   if(a==='fs'){toggleFullscreen();return}
+  if(a==='quit'){if(quitArm&&Date.now()-quitArm<3000){quitArm=0;clearTimeout(quitTimer);await quitGame()}
+    else{quitArm=Date.now();b.textContent='Tap again to quit';clearTimeout(quitTimer);quitTimer=setTimeout(()=>{quitArm=0;render()},3000)}return}
   if(a==='takeover'){await mutate(()=>{G.botRunner=ME});return}
   if(a==='accept'||a==='decline'){const id=b.dataset.id;
     if(a==='accept')await mutate(()=>{const o=G.offer;if(!o||o.id!==id)return false;const from=G.players[o.from],to=G.players[ME];
@@ -545,7 +562,7 @@ $('#lobby').addEventListener('click',async e=>{const b=e.target.closest('[data-l
   if(a==='start'){await mutate(()=>{if(G.phase!=='lobby'||G.host!==UID)return false;const ng=buildGame(G.seats,G.host);ng.v=G.v;sync(G,ng)});return}
   if(a==='copy'){copyLink();return}
   if(a==='fs'){toggleFullscreen();return}
-  if(a==='leave'){CODE=null;G=null;ME=-1;clearInterval(pollTimer);if(chan){sb.removeChannel(chan);chan=null}history.replaceState(null,'',location.pathname);render()}
+  if(a==='leave'){await quitGame()}
 });
 async function createGame(n){
   for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n}],v:1};
@@ -603,8 +620,8 @@ function discardModal(k){return new Promise(res=>{const sel=z();
       b=>{const d=b.dataset.d;if(!d)return;if(d==='ok'){closeModal();res({...sel});return}const r=d.slice(1);sel[r]+=d[0]==='+'?1:-1;draw()})};
   draw()})}
 function showWin(){L.winShown=true;const w=G.players[G.winner],host=G.host===UID,rows=G.players.map(p=>`<div class="pl"><span class="sw" style="background:${p.color}"></span><b>${nm(p.i)}</b><span class="vp">${vp(p,true)}</span></div>`).join('');
-  modal(`<h3>${w.i===ME?'You win the island':pn(w)+' wins the island'}</h3><p>${w.i===ME?'Ten points, fairly earned.':'Better luck on the next map.'}</p><div class="players">${rows}</div><div class="opts">${host?'<button class="primary" data-c="again">Play again</button>':''}<button data-c="close">Look at the board</button></div>${host?'':'<p>The host can start a rematch with the same players.</p>'}`,
-    b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name}));sync(G,{phase:'lobby',host:G.host,seats,v:G.v})})}else if(b.dataset.c==='close')closeModal()})}
+  modal(`<h3>${w.i===ME?'You win the island':pn(w)+' wins the island'}</h3><p>${w.i===ME?'Ten points, fairly earned.':'Better luck on the next map.'}</p><div class="players">${rows}</div><div class="opts">${host?'<button class="primary" data-c="again">Play again</button>':''}<button data-c="close">Look at the board</button><button data-c="home">Back to start</button></div>${host?'':'<p>The host can start a rematch with the same players.</p>'}`,
+    b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name}));sync(G,{phase:'lobby',host:G.host,seats,v:G.v})})}else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
 let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3500)}
 
 /* ---------- render ---------- */
@@ -656,7 +673,7 @@ function statusText(){const p=P();
   if(G.offer&&G.offer.from===ME)return 'Waiting for answers to your trade offer…';
   if(G.phase==='roll')return '<b>Your turn.</b> Roll the dice.';
   return 'Build, trade or play a card, then end your turn.';}
-function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor</h1><div class="status">${statusText()}</div><button class="ghost code-btn" data-act="copy" title="Copy invite link">${esc(CODE)}</button>${fsButton('data-act')}`}
+function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor</h1><div class="status">${statusText()}</div><button class="ghost code-btn" data-act="copy" title="Copy invite link">${esc(CODE)}</button>${fsButton('data-act')}<button class="ghost" data-act="quit">${quitArm&&Date.now()-quitArm<3000?'Tap again to quit':'Quit'}</button>`}
 function renderOffer(){const o=G.offer,el=$('#offerbar');
   if(!o||won()){el.innerHTML='';return}
   const from=G.players[o.from],txt=`${o.from===ME?'You offer':'<b>'+pn(from)+'</b> offers'} <b>${fmt(o.give)}</b> for <b>${fmt(o.get)}</b>`;
