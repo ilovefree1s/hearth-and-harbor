@@ -217,6 +217,10 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .epulse{animation:epulse 1s ease-in-out infinite}
 @keyframes epulse{50%{stroke:#fffbe0}}
 @media (prefers-reduced-motion:reduce){.epulse{animation:none}}
+/* "You have" counts above the trade steppers */
+.oh .ohtop{display:flex;align-items:center;gap:4px}
+.oh .have{font-family:var(--display);font-weight:800;font-size:18px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
+.oh .have.none{color:var(--line)}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -840,7 +844,7 @@ function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&
     <div class="trow"><span class="lbl">Bank</span><select id="bg" data-ui="bg" aria-label="Give to bank">${opt('bg')}</select><span>×${bk} →</span><select id="bt" data-ui="bt" aria-label="Get from bank">${opt('bt')}</select>
       <button data-act="bank" ${main&&!L.mode&&u.bg!==u.bt&&me.res[u.bg]>=bk?'':'disabled'}>Trade</button></div>
     <div class="offer">
-      <span></span>${RES.map(r=>`<span class="oh"><span class="sw" style="background:${TILE[r].fill}"></span>${RN[r]}</span>`).join('')}
+      <span class="lbl">You have</span>${RES.map(r=>`<span class="oh"><span class="ohtop"><b class="have${me.res[r]?'':' none'}">${me.res[r]}</b><span class="sw" style="background:${TILE[r].fill}"></span></span>${RN[r]}</span>`).join('')}
       ${['give','get'].map(side=>`<span class="lbl">${side==='give'?'You give':'You get'}</span>${RES.map(r=>{const n=u[side][r],canUp=main&&!L.mode&&(side==='get'||n<me.res[r]);
         return `<span class="step ${n?'on':''}"><button data-act="tr" data-side="${side}" data-r="${r}" data-d="-1" ${main&&n?'':'disabled'} aria-label="${side} one less ${RN[r]}">−</button><b>${n}</b><button data-act="tr" data-side="${side}" data-r="${r}" data-d="1" ${canUp?'':'disabled'} aria-label="${side} one more ${RN[r]}">+</button></span>`}).join('')}`).join('')}
     </div>
