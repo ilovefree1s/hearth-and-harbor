@@ -545,17 +545,29 @@ function setupSpotInfo(id){const v=G.verts[id],second=G.setupIdx>=4;
   if(second){const g={};tiles.forEach(t=>{if(t.type!=='desert')g[t.type]=(g[t.type]||0)+1});
     txt+=`<br><br><b>You'll get right away:</b> ${fmt(g)||'nothing (only Dunes here)'}`}
   return txt}
+const costTxt=c=>Object.entries(c).map(([r,n])=>n+' '+RN[r]).join(', ');
+async function confirmBuild(title,text,okLabel){if(L.confirming)return false;L.confirming=true;render();
+  try{return await chooseModal(title,text,[{label:okLabel,value:true},{label:'Cancel',value:false}],true)}finally{L.confirming=false}}
 async function onVertex(id){const me=G.players[ME];if(!hotVerts().has(id))return;
   if(G.phase==='setup'){
     if(L.confirming)return;L.confirming=true;L.vertPreview=id;render();
     const ok=await chooseModal(`Place your ${G.setupIdx>=4?'second':'first'} settlement here?`,setupSpotInfo(id),[{label:'Place settlement',value:true},{label:'Pick another spot',value:false}],true);
     L.confirming=false;L.vertPreview=null;
     if(!ok||!hotVerts().has(id)){render();return}placeSetupSettlement(ME,id);render();await push();return}
+  const city=L.mode==='city';L.vertPreview=id;
+  const ok=await confirmBuild(city?'Upgrade this settlement to a city?':'Build a settlement here?',
+    `Costs <b>${costTxt(city?COST.city:COST.settlement)}</b>.${city?' Worth 2 points and doubles what this spot collects.':' Worth 1 point.'}`,city?'Build city':'Build settlement');
+  L.vertPreview=null;
+  if(!ok||!hotVerts().has(id)||!afford(me,city?COST.city:COST.settlement)){render();return}
   if(L.mode==='settlement')buildSettlement(me,id);else if(L.mode==='city')buildCity(me,id);
   L.mode=null;checkWin();render();await push()}
 async function onEdge(id){const me=G.players[ME];if(!hotEdges().has(id))return;
   if(G.phase==='setup'){placeSetupRoad(ME,id);G.botRunner=ME;render();await push();afterChange();return}
-  if(L.mode==='road'){buildRoad(me,id);L.mode=null}
+  if(L.mode==='road'){L.edgePreview=id;
+    const ok=await confirmBuild('Build a road here?',`Costs <b>${costTxt(COST.road)}</b>.`,'Build road');
+    L.edgePreview=null;
+    if(!ok||!hotEdges().has(id)||!afford(me,COST.road)||L.mode!=='road'){render();return}
+    buildRoad(me,id);L.mode=null}
   else if(L.mode==='freeRoad'){buildRoad(me,id,true);G.freeRoads--;if(G.freeRoads<=0||!hotEdges().size){L.mode=null;G.freeRoads=0}}
   checkWin();render();await push()}
 function onTile(id){if(hotTiles().has(id)&&L.robberResolve){const r=L.robberResolve;L.robberResolve=null;r(id)}}
@@ -611,7 +623,9 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
     if(Date.now()-(L.endArm||0)>=3000){L.endArm=Date.now();render();clearTimeout(L.endArmT);L.endArmT=setTimeout(()=>{L.endArm=0;render()},3000);return}
     L.endArm=0;clearTimeout(L.endArmT);L.mode=null;nextTurn();G.botRunner=ME;render();await push();afterChange();return}
   if(a.startsWith('mode-')){const m=a.slice(5);L.mode=L.mode===m?null:m;render();return}
-  if(a==='buydev'){buyDev(me);checkWin();render();await push();return}
+  if(a==='buydev'){const ok=await confirmBuild('Buy a development card?',`Costs <b>${costTxt(COST.dev)}</b>. You draw a random card: a Knight, Victory Point, Road Building, Year of Plenty or Monopoly.`,'Buy card');
+    if(!ok||!myTurn()||G.phase!=='main'||!afford(me,COST.dev)||!G.deck.length){render();return}
+    buyDev(me);checkWin();render();await push();return}
   if(a.startsWith('play-')){L.flow=true;L.mode=null;render();try{await playDev(me,a.slice(5))}finally{L.flow=false}render();return}
   if(a==='bank'){const{bg,bt}=L.ui,k=rate(ME,bg);me.res[bg]-=k;me.res[bt]++;log(me,`traded ${k} ${RN[bg]} to the bank for 1 ${RN[bt]}`);render();await push();return}
   if(a==='tr'){const side=b.dataset.side,other=side==='give'?'get':'give',r=b.dataset.r,d=+b.dataset.d,u=L.ui;
@@ -691,8 +705,8 @@ function renderLobby(){const el=$('#lobby');let h;
 
 /* ---------- modals ---------- */
 const M=$('#modal');let mH=null;
-M.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&mH&&!b.disabled)mH(b)});
-function modal(html,h,low){M.classList.toggle('low',!!low);M.querySelector('.box').innerHTML=html;M.hidden=false;mH=h;const f=M.querySelector('button:not(:disabled)');if(f)f.focus()}
+M.addEventListener('click',e=>{if(Date.now()-(M.openedAt||0)<400)return;const b=e.target.closest('button');if(b&&mH&&!b.disabled)mH(b)});
+function modal(html,h,low){if(M.hidden)M.openedAt=Date.now();M.classList.toggle('low',!!low);M.querySelector('.box').innerHTML=html;M.hidden=false;mH=h;const f=M.querySelector('button:not(:disabled)');if(f)f.focus()}
 function closeModal(){M.hidden=true;mH=null}
 function chooseModal(title,text,opts,low){return new Promise(res=>{
   modal(`<h3>${title}</h3><p>${text}</p><div class="opts">${opts.map((o,i)=>`<button data-c="${i}">${o.color?`<span class="sw" style="background:${o.color};width:14px;height:14px;margin-right:6px;vertical-align:-2px"></span>`:''}${o.label}</button>`).join('')}</div>`,
@@ -738,6 +752,7 @@ function renderBoard(){const hv=hotVerts(),he=hotEdges(),ht=hotTiles();let s=PAT
     s+=`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hot-e-bg"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hot-e epulse"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="hit" stroke-width="18" data-e="${id}"><title>Build a road here</title></line>`});
   G.verts.forEach(v=>{if(!v.b)return;const c=G.players[v.b.p].color;
     s+=`<path transform="translate(${v.x.toFixed(1)},${v.y.toFixed(1)})" d="${v.b.city?'M-12 8V-4L-5-10L2-4V-1H12V8Z':'M-8 6V-3L0-10L8-3V6Z'}" fill="${c}" stroke="#1d1a17" stroke-width="2" stroke-linejoin="round"/>`});
+  if(L.edgePreview!=null){const e=G.edges[L.edgePreview],A=G.verts[e.a],B=G.verts[e.b];s+=`<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="#111" stroke-width="15" stroke-linecap="round"/><line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="${G.players[ME].color}" stroke-width="9" stroke-linecap="round"/>`}
   if(L.vertPreview!=null){const v=G.verts[L.vertPreview];s+=`<circle cx="${v.x}" cy="${v.y}" r="13" fill="var(--hot)" stroke="#1d2a2f" stroke-width="3"/>`}
   hv.forEach(id=>{const v=G.verts[id];s+=`<circle cx="${v.x}" cy="${v.y}" r="${L.mode==='city'?14:8}" class="hot-v pulse" ${L.mode==='city'?'fill-opacity=".35"':''}/><circle cx="${v.x}" cy="${v.y}" r="16" class="hit" data-v="${id}"><title>${L.mode==='city'?'Upgrade to a city':'Build a settlement here'}</title></circle>`});
   $('#board').innerHTML=s}
