@@ -502,7 +502,7 @@ async function connect(code){
   const{data,error}=await sb.from('hh_games').select('state,v').eq('id',code).maybeSingle();
   if(error||!data){L.err=error?'Could not reach the game server: '+error.message:`No game found with code ${esc(code)}.`;CODE=null;history.replaceState(null,'',location.pathname);render();return false}
   if(data.state&&data.state.phase==='closed'){L.err='That room closed because nobody joined. Tap Quick join or start a new game.';CODE=null;history.replaceState(null,'',location.pathname);render();return false}
-  CODE=code;history.replaceState(null,'',location.pathname+'?g='+code);
+  CODE=code;history.replaceState(null,'',location.pathname+'?g='+code);store.set('hh-last',code);
   G=data.state;G.v=data.v;
   if(chan)sb.removeChannel(chan);
   chan=sb.channel('game-'+code).on('postgres_changes',{event:'UPDATE',schema:'public',table:'hh_games',filter:'id=eq.'+code},pl=>onRemote(pl.new)).subscribe();
@@ -593,7 +593,7 @@ async function toggleFullscreen(){
 document.addEventListener('fullscreenchange',()=>render());document.addEventListener('webkitfullscreenchange',()=>render());
 /* quitting: your seat goes to a computer player so the others can keep going */
 let quitArm=0,quitTimer=null;
-function goHome(){CODE=null;G=null;ME=-1;L.mode=null;L.flow=false;L.winShown=false;L.robberResolve=null;closeModal();clearInterval(pollTimer);if(chan){sb.removeChannel(chan);chan=null}
+function goHome(){store.set('hh-last','');CODE=null;G=null;ME=-1;L.mode=null;L.flow=false;L.winShown=false;L.robberResolve=null;closeModal();clearInterval(pollTimer);if(chan){sb.removeChannel(chan);chan=null}
   history.replaceState(null,'',location.pathname);L.openSig='';render();refreshOpen()}
 async function quitGame(){
   if(G&&G.players&&ME>=0&&!won()){const seat=ME;
@@ -722,7 +722,7 @@ function discardModal(k){return new Promise(res=>{const sel=z();
       <button class="primary" data-d="ok" ${tot===k?'':'disabled'}>Discard ${tot} of ${k}</button>`,
       b=>{const d=b.dataset.d;if(!d)return;if(d==='ok'){closeModal();res({...sel});return}const r=d.slice(1);sel[r]+=d[0]==='+'?1:-1;draw()})};
   draw()})}
-function showWin(){L.winShown=true;const w=G.players[G.winner],host=G.host===UID,rows=G.players.map(p=>`<div class="pl"><span class="sw" style="background:${p.color}"></span><b>${nm(p.i)}</b><span class="vp">${vp(p,true)}</span></div>`).join('');
+function showWin(){L.winShown=true;store.set('hh-last','');const w=G.players[G.winner],host=G.host===UID,rows=G.players.map(p=>`<div class="pl"><span class="sw" style="background:${p.color}"></span><b>${nm(p.i)}</b><span class="vp">${vp(p,true)}</span></div>`).join('');
   modal(`<h3>${w.i===ME?'You win the island':pn(w)+' wins the island'}</h3><p>${w.i===ME?'Ten points, fairly earned.':'Better luck on the next map.'}</p><div class="players">${rows}</div><div class="opts">${host?'<button class="primary" data-c="again">Play again</button>':''}<button data-c="close">Look at the board</button><button data-c="home">Back to start</button></div>${host?'':'<p>The host can start a rematch with the same players.</p>'}`,
     b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name}));sync(G,{phase:'lobby',host:G.host,seats,v:G.v})})}else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
 let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3500)}
@@ -859,10 +859,19 @@ function render(){
   if(G.discards&&G.discards[ME]&&!L.discarding&&!won())promptDiscard()}
 
 /* ---------- boot ---------- */
+/* is this device still a player in that game? (used to drop you back in after the phone reloads the page) */
+async function stillSeated(code){try{const{data}=await sb.from('hh_games').select('state').eq('id',code).maybeSingle();const s=data&&data.state;
+  if(!s||s.phase==='closed'||s.winner!=null){store.set('hh-last','');return false}
+  if(s.phase==='lobby')return (s.seats||[]).some(x=>x.uid===UID);
+  return (s.players||[]).some(p=>p.uid===UID)}catch(e){return false}}
+/* catch up the moment you come back to the tab */
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&CODE&&G&&!pushing)refetch().catch(()=>{})});
+window.addEventListener('pageshow',e=>{if(e.persisted&&CODE&&G)refetch().catch(()=>{})});
 (async function boot(){
   if(CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_ANON_KEY&&window.supabase)sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY);
   const code=new URLSearchParams(location.search).get('g');
   if(sb&&code){L.codeDraft=code.toUpperCase();await connect(code.toUpperCase())}
+  else if(sb&&store.get('hh-last')&&await stillSeated(store.get('hh-last')))await connect(store.get('hh-last'));
   else render();
   if(sb){refreshOpen();openTimer=setInterval(refreshOpen,5000)}})();
 </script>
