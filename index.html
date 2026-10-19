@@ -221,6 +221,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .oh .ohtop{display:flex;align-items:center;gap:4px}
 .oh .have{font-family:var(--display);font-weight:800;font-size:18px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
 .oh .have.none{color:var(--line)}
+.ms.champ{outline:3px solid #ffd23f;outline-offset:1px;box-shadow:0 0 12px rgba(255,210,63,.9)}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -790,8 +791,8 @@ function renderMapCtl(spect,my,main){const el=$('#mapctl');
   const canEnd=main&&!L.mode&&!locked;
   const armed=canEnd&&Date.now()-(L.endArm||0)<3000;
   el.innerHTML=`<span></span><span class="endwrap">${armed?'<span class="sure">Are you sure?</span>':''}<button class="mapbtn endturn" data-act="end" ${canEnd?'':'disabled'}>End turn</button></span>`}
-function renderMapScore(){$('#mapscore').innerHTML=G.players.map(p=>{const pts=vp(p,p.i===ME),close=WIN-pts<=2;
-  return `<span class="ms${p.i===3?' light':''}${close?' close':''}${G.cur===p.i&&!won()?' cur':''}" style="background:${p.color}" title="${nm(p.i)}: ${pts} points">${pts}</span>`}).join('')}
+function renderMapScore(){$('#mapscore').innerHTML=G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2;
+  return `<span class="ms${p.i===3?' light':''}${close&&!won()?' close':''}${G.cur===p.i&&!won()?' cur':''}${won()&&G.winner===p.i?' champ':''}" style="background:${p.color}" title="${nm(p.i)}: ${pts} points">${pts}</span>`}).join('')}
 function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
   if(!rs.length){el.innerHTML='<span class="belt-empty">Dice rolls will show here</span>';return}
   el.innerHTML=rs.map((r,k)=>{const p=G.players[r.p],s=r.a+r.b;
@@ -817,7 +818,7 @@ function renderOffer(){const o=G.offer,el=$('#offerbar');
   el.innerHTML=`<span class="sw" style="background:${from.color}"></span><span class="txt">${txt}<br><small>Waiting on: ${waiting.join(', ')||'nobody'}</small></span>${btns}`}
 function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&&!L.flow,main=my&&G.phase==='main'&&L.mode!=='freeRoad'&&!G.offer;
   const s=G.dice?G.dice[0]+G.dice[1]:'';
-  const players=`<section><h2>Players · first to ${WIN}</h2><div class="players">${G.players.map(p=>{const pts=vp(p,p.i===ME),close=WIN-pts<=2;return `<div class="pl ${G.cur===p.i&&!won()?'cur':''}"><span class="score ${p.i===3?'light':''} ${close?'close':''}" style="background:${p.color}" title="${pts} points">${pts}</span><b>${nm(p.i)}${isBot(p)?'<span class="botlbl">computer</span>':''}${G.longest===p.i?'<span class="badge">Road</span>':''}${G.army===p.i?'<span class="badge">Army</span>':''}</b><span class="togo ${close?'close':''}">${pts>=WIN?'won':(WIN-pts)+' to win'}</span>
+  const players=`<section><h2>Players · first to ${WIN}</h2><div class="players">${G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2;return `<div class="pl ${G.cur===p.i&&!won()?'cur':''}"><span class="score ${p.i===3?'light':''} ${close?'close':''}" style="background:${p.color}" title="${pts} points">${pts}</span><b>${nm(p.i)}${isBot(p)?'<span class="botlbl">computer</span>':''}${G.longest===p.i?'<span class="badge">Road</span>':''}${G.army===p.i?'<span class="badge">Army</span>':''}</b><span class="togo ${close?'close':''}">${pts>=WIN?'won':(WIN-pts)+' to win'}</span>
     <span class="meta">${cards(p)} cards · ${p.dev.length} dev · ${p.knights} knights · road ${G.lens[p.i]}</span></div>`}).join('')}</div></section>`;
   const logH=`<section><h2>Log</h2><div class="log">${G.log.slice().reverse().map(l=>{const t=(l.secret&&l.secret[ME])||l.text;return l.p===null?`<div class="sys">${t}</div>`:`<div><span class="sw" style="background:${G.players[l.p].color}"></span><span><b>${nm(l.p)}</b> ${t}</span></div>`}).join('')}</div></section>`;
   const dice='';
