@@ -839,7 +839,6 @@ function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&
     <button data-act="mode-city" class="${L.mode==='city'?'active':''}" ${bOK.city||L.mode==='city'?'':'disabled'}>City · 2 pts${costChips(COST.city)}</button>
     <button data-act="buydev" ${main&&!L.mode&&afford(me,COST.dev)&&G.deck.length?'':'disabled'}>Dev card · ${G.deck.length} left${costChips(COST.dev)}</button>
   </div></section>
-  `+players+`
   <section><h2>Development cards</h2><div class="devs">${devHtml}</div></section>
   <section><h2>Trade</h2><div class="trade">
     <div class="trow"><span class="lbl">Bank</span><select id="bg" data-ui="bg" aria-label="Give to bank">${opt('bg')}</select><span>×${bk} →</span><select id="bt" data-ui="bt" aria-label="Get from bank">${opt('bt')}</select>
@@ -850,7 +849,7 @@ function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&
         return `<span class="step ${n?'on':''}"><button data-act="tr" data-side="${side}" data-r="${r}" data-d="-1" ${main&&n?'':'disabled'} aria-label="${side} one less ${RN[r]}">−</button><b>${n}</b><button data-act="tr" data-side="${side}" data-r="${r}" data-d="1" ${canUp?'':'disabled'} aria-label="${side} one more ${RN[r]}">+</button></span>`}).join('')}`).join('')}
     </div>
     <div class="trow"><button data-act="offer" class="primary" ${main&&!L.mode&&RES.some(r=>u.give[r])&&RES.some(r=>u.get[r])&&RES.every(r=>u.give[r]<=me.res[r])?'':'disabled'}>Offer to players</button><button class="ghost" data-act="trclear" ${RES.some(r=>u.give[r]||u.get[r])?'':'disabled'}>Clear</button></div>
-  </div></section>`+logH}
+  </div></section>`+players+logH}
 function render(){
   const inGame=G&&G.phase&&G.phase!=='lobby';
   $('#app').hidden=!inGame;$('#lobby').hidden=!!inGame;
