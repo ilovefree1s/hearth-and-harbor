@@ -222,6 +222,12 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .oh .have{font-family:var(--display);font-weight:800;font-size:18px;line-height:1;color:var(--ink);font-variant-numeric:tabular-nums}
 .oh .have.none{color:var(--line)}
 .ms.champ{outline:3px solid #ffd23f;outline-offset:1px;box-shadow:0 0 12px rgba(255,210,63,.9)}
+/* color picker */
+.cpick{display:flex;gap:8px;flex-wrap:wrap}
+.csw{width:40px;height:40px;min-height:0;padding:0;border-radius:10px;border:2px solid rgba(0,0,0,.35);color:#fff;font-size:18px;font-weight:800;text-shadow:0 1px 2px rgba(0,0,0,.6)}
+.csw.on{outline:3px solid var(--ink);outline-offset:2px}
+.csw:disabled{opacity:.25;cursor:not-allowed}
+.csw[data-c="#f2efe6"]{color:var(--ink);text-shadow:none}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -248,6 +254,10 @@ const TILE={wood:{fill:'#4b7a37',name:'Forest'},brick:{fill:'#b65f37',name:'Clay
 const COST={road:{wood:1,brick:1},settlement:{wood:1,brick:1,wool:1,grain:1},city:{grain:2,ore:3},dev:{wool:1,grain:1,ore:1}};
 const DEV={knight:['Knight','Move the robber and steal a card.'],road:['Road Building','Place two roads for free.'],plenty:['Year of Plenty','Take any two resources.'],monopoly:['Monopoly','Claim every card of one resource.'],vp:['Victory Point','Counts toward your score. Kept hidden.']};
 const PCOL=['#2f6db3','#c8423b','#e08a2a','#f2efe6'];
+const COLORS=[{c:'#2f6db3',n:'Blue'},{c:'#c8423b',n:'Red'},{c:'#e08a2a',n:'Orange'},{c:'#f2efe6',n:'White'},{c:'#7d4fb8',n:'Purple'},{c:'#d9549a',n:'Pink'}];
+const isLight=c=>c==='#f2efe6';
+const colorName=c=>(COLORS.find(x=>x.c===c)||{n:'Color'}).n;
+function freeColor(pref,taken){if(pref&&!taken.includes(pref))return pref;return COLORS.map(x=>x.c).find(c=>!taken.includes(c))}
 const BOTNAMES=['Marga','Tobin','Esk','Wren','Corin','Ilsa'];
 const S=60,SQ3=Math.sqrt(3),WIN=10,AI_PACE=1.3;
 const pips=n=>n?6-Math.abs(7-n):0;
@@ -266,7 +276,7 @@ const L={mode:null,flow:false,busy:false,robberResolve:null,robberPreview:null,u
 let G=null,ME=-1,CODE=null,sb=null,chan=null,pushing=0,myMaxV=0,waiters=[],pollTimer=null;
 const store={get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
 const UID=store.get('hh-uid')||(()=>{const u=Math.random().toString(36).slice(2,12)+Date.now().toString(36);store.set('hh-uid',u);return u})();
-let MYNAME=store.get('hh-name')||'';L.nameDraft=MYNAME;
+let MYNAME=store.get('hh-name')||'';let MYCOLOR=store.get('hh-color')||COLORS[0].c;L.nameDraft=MYNAME;
 
 /* ---------- board setup ---------- */
 function buildGame(seats,host){
@@ -295,7 +305,9 @@ function buildGame(seats,host){
   const ports=[0,3,7,10,13,17,20,23,27].map((ci,i)=>{const e=coast[ci].e;verts[e.a].port=ptypes[i];verts[e.b].port=ptypes[i];return{e:e.id,type:ptypes[i]}});
   const taken=new Set(seats.map(s=>s.name.toLowerCase()));const botPool=shuffle(BOTNAMES.filter(n=>!taken.has(n.toLowerCase())));
   const entries=shuffle([...seats.map(s=>({kind:'human',uid:s.uid,name:s.name})),...Array(4-seats.length).fill(0).map((_,k)=>({kind:'bot',uid:null,name:botPool[k]}))]);
-  const players=entries.map((e,i)=>({i,name:e.name,kind:e.kind,uid:e.uid,color:PCOL[i],res:z(),dev:[],knights:0,roads:15,setts:5,cities:4}));
+  const used=seats.map(s=>s.color).filter(Boolean);const botCols=[...PCOL,...COLORS.map(x=>x.c)].filter((c,k,a)=>a.indexOf(c)===k&&!used.includes(c));
+  entries.forEach(e=>{if(e.kind==='human'){const s=seats.find(s=>s.uid===e.uid);e.color=s&&s.color}if(!e.color)e.color=botCols.shift()});
+  const players=entries.map((e,i)=>({i,name:e.name,kind:e.kind,uid:e.uid,color:e.color,res:z(),dev:[],knights:0,roads:15,setts:5,cities:4}));
   const deck=shuffle([...Array(14).fill('knight'),...Array(5).fill('vp'),'road','road','plenty','plenty','monopoly','monopoly']);
   const first=Math.random()*4|0,order=[0,1,2,3].map(i=>(first+i)%4);
   const hostSeat=players.findIndex(p=>p.uid===host);
@@ -364,7 +376,7 @@ async function rollDice(){const a=1+(Math.random()*6|0),b=1+(Math.random()*6|0);
 async function moveRobber(){const p=P();let ti;G.phase='robber';await push();
   if(!isBot(p)){L.mode='robber';render();
     for(;;){ti=await new Promise(r=>L.robberResolve=r);const t=G.tiles[ti];
-      const who=[...new Set(t.v.map(v=>G.verts[v].b).filter(Boolean).map(b=>b.p))].map(i=>`<span class="chip${i===3?' light':''}" style="background:${G.players[i].color}">${nm(i)} · ${cards(G.players[i])} cards</span>`);
+      const who=[...new Set(t.v.map(v=>G.verts[v].b).filter(Boolean).map(b=>b.p))].map(i=>`<span class="chip${isLight(G.players[i].color)?' light':''}" style="background:${G.players[i].color}">${nm(i)} · ${cards(G.players[i])} cards</span>`);
       L.robberPreview=ti;render();
       const ok=await chooseModal('Move the robber here?',`${TILE[t.type].name}${t.num?' ('+t.num+')':''}. ${who.length?'<br>On this tile: '+who.join(' '):'<br>No one has a building on this tile.'}`,
         [{label:'Move robber',value:true},{label:'Pick another tile',value:false}],true);
@@ -661,6 +673,9 @@ $('#lobby').addEventListener('click',async e=>{const b=e.target.closest('[data-l
   if(a==='openjoin'){const n=setName();if(!n)return;if(await connect(b.dataset.id)&&G.phase==='lobby')await joinSeat();return}
   if(a==='join'){const n=setName();if(!n)return;const code=cleanName(L.codeDraft).toUpperCase().replace(/[^A-Z0-9]/g,'');if(!code){L.err='Enter the game code.';render();return}
     if(await connect(code)&&G.phase==='lobby')await joinSeat();return}
+  if(a==='pickcolor'){const c=b.dataset.c;MYCOLOR=c;store.set('hh-color',c);
+    if(G&&G.phase==='lobby'&&G.seats.some(s=>s.uid===UID)){await mutate(()=>{if(G.phase!=='lobby')return false;const s=G.seats.find(s=>s.uid===UID);
+      if(!s||G.seats.some(x=>x!==s&&x.color===c))return false;s.color=c})}else render();return}
   if(a==='joinseat'){if(!setName())return;await joinSeat();return}
   if(a==='start'){await mutate(()=>{if(G.phase!=='lobby'||G.host!==UID)return false;const ng=buildGame(G.seats,G.host);ng.v=G.v;sync(G,ng)});return}
   if(a==='copy'){copyLink();return}
@@ -668,7 +683,7 @@ $('#lobby').addEventListener('click',async e=>{const b=e.target.closest('[data-l
   if(a==='leave'){await quitGame()}
 });
 async function createGame(n){
-  for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n}],created:Date.now(),joined:false,v:1};
+  for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n,color:MYCOLOR}],created:Date.now(),joined:false,v:1};
     const{error}=await sb.from('hh_games').insert({id:code,state:st,v:1});
     if(!error){await connect(code);return}
     if(!String(error.code).startsWith('23')){L.err='Could not create the game: '+esc(error.message);render();return}}}
@@ -681,13 +696,16 @@ async function refreshOpen(){if(G||!sb)return;const list=await findOpen();if(G)r
   const sig=JSON.stringify(list.map(r=>[r.id,r.state.seats.length]));if(sig!==L.openSig){L.open=list;L.openSig=sig;
     const f=document.activeElement&&document.activeElement.id,pos=f&&document.activeElement.selectionStart;render();
     if(f){const el=document.getElementById(f);if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(e){}}}}}
-async function joinSeat(){await mutate(()=>{if(G.phase!=='lobby')return false;const s=G.seats.find(s=>s.uid===UID);if(s){s.name=MYNAME;return}
-  if(G.seats.length>=4){L.err='This game already has 4 players.';return false}G.seats.push({uid:UID,name:MYNAME});if(G.seats.length>1)G.joined=true})}
+async function joinSeat(){await mutate(()=>{if(G.phase!=='lobby')return false;const s=G.seats.find(s=>s.uid===UID);if(s){s.name=MYNAME;if(!s.color)s.color=freeColor(MYCOLOR,G.seats.filter(x=>x!==s).map(x=>x.color));return}
+  if(G.seats.length>=4){L.err='This game already has 4 players.';return false}G.seats.push({uid:UID,name:MYNAME,color:freeColor(MYCOLOR,G.seats.map(x=>x.color))});if(G.seats.length>1)G.joined=true})}
+function colorPicker(taken){return `<div><label>Your color</label><div class="cpick">${COLORS.map(x=>{const t=taken.includes(x.c),on=x.c===MYCOLOR;
+  return `<button type="button" class="csw${on?' on':''}" data-l="pickcolor" data-c="${x.c}" style="background:${x.c}" ${t?'disabled':''} aria-label="${x.n}${t?' (taken)':''}" aria-pressed="${on}" title="${x.n}${t?' · taken':''}">${on?'✓':''}</button>`}).join('')}</div></div>`}
 function renderLobby(){const el=$('#lobby');let h;
   const err=L.err?`<div class="err">${L.err}</div>`:'';
   if(!sb)h=`<h1>Hearth &amp; Harbor</h1><p>This copy isn't connected to a game server yet. Open <b>index.html</b>, fill in <b>SUPABASE_URL</b> and <b>SUPABASE_ANON_KEY</b> near the top, and upload it again.</p>`;
   else if(!G)h=`<h1>Hearth &amp; Harbor</h1><p>Build, trade and race your friends to 10 points.</p>
     <div><label for="nm">Your name</label><input id="nm" maxlength="16" autocomplete="nickname" value="${esc(L.nameDraft)}" placeholder="e.g. Sam"></div>
+    ${colorPicker([])}
     <button class="primary" data-l="quick">Quick join</button>
     <p style="font-size:13px;margin-top:-6px">Jumps into a game that's waiting for players, or starts a new one if none is open.</p>
     ${L.open&&L.open.length?`<div><label>Open games</label><div class="seats">${L.open.map(r=>{const host=r.state.seats.find(s=>s.uid===r.state.host)||r.state.seats[0];
@@ -699,8 +717,9 @@ function renderLobby(){const el=$('#lobby');let h;
   else{const seated=G.seats.some(s=>s.uid===UID),host=G.host===UID,bots=4-G.seats.length;
     h=`<h1>Hearth &amp; Harbor</h1><div><label>Game code</label><div class="code">${esc(CODE)}</div></div>
     <button data-l="copy">Copy invite link</button>
-    <div class="seats">${G.seats.map(s=>`<div class="seat"><b>${esc(s.name)}</b>${s.uid===UID?' (you)':''}${s.uid===G.host?'<span class="tag">Host</span>':''}</div>`).join('')}
+    <div class="seats">${G.seats.map(s=>`<div class="seat"><span class="sw" style="background:${s.color||'#ccc'}"></span><b>${esc(s.name)}</b>${s.uid===UID?' (you)':''}${s.uid===G.host?'<span class="tag">Host</span>':''}</div>`).join('')}
       ${Array(bots).fill(0).map(()=>`<div class="seat bot">Computer player</div>`).join('')}</div>
+    ${colorPicker(G.seats.filter(s=>s.uid!==UID).map(s=>s.color))}
     <p>Up to 4 people. Empty seats are played by the computer, and seats are drawn at random when the game starts.</p>
     ${seated?'':`<div class="lrow"><div><label for="nm">Your name</label><input id="nm" maxlength="16" value="${esc(L.nameDraft)}"></div><button class="primary" data-l="joinseat" ${G.seats.length>=4?'disabled':''}>Join</button></div>`}
     ${host&&closesIn()!==null?`<p><b>Room closes in <span id="countdown">${Math.ceil(closesIn()/1000)}</span>s</b> if nobody joins. You can start now and play against computer players.</p>`:''}
@@ -725,7 +744,7 @@ function discardModal(k){return new Promise(res=>{const sel=z();
   draw()})}
 function showWin(){L.winShown=true;store.set('hh-last','');const w=G.players[G.winner],host=G.host===UID,rows=G.players.map(p=>`<div class="pl"><span class="sw" style="background:${p.color}"></span><b>${nm(p.i)}</b><span class="vp">${vp(p,true)}</span></div>`).join('');
   modal(`<h3>${w.i===ME?'You win the island':pn(w)+' wins the island'}</h3><p>${w.i===ME?'Ten points, fairly earned.':'Better luck on the next map.'}</p><div class="players">${rows}</div><div class="opts">${host?'<button class="primary" data-c="again">Play again</button>':''}<button data-c="close">Look at the board</button><button data-c="home">Back to start</button></div>${host?'':'<p>The host can start a rematch with the same players.</p>'}`,
-    b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name}));sync(G,{phase:'lobby',host:G.host,seats,v:G.v})})}else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
+    b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name,color:p.color}));sync(G,{phase:'lobby',host:G.host,seats,v:G.v})})}else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
 let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3500)}
 
 /* ---------- render ---------- */
@@ -792,7 +811,7 @@ function renderMapCtl(spect,my,main){const el=$('#mapctl');
   const armed=canEnd&&Date.now()-(L.endArm||0)<3000;
   el.innerHTML=`<span></span><span class="endwrap">${armed?'<span class="sure">Are you sure?</span>':''}<button class="mapbtn endturn" data-act="end" ${canEnd?'':'disabled'}>End turn</button></span>`}
 function renderMapScore(){$('#mapscore').innerHTML=G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2;
-  return `<span class="ms${p.i===3?' light':''}${close&&!won()?' close':''}${G.cur===p.i&&!won()?' cur':''}${won()&&G.winner===p.i?' champ':''}" style="background:${p.color}" title="${nm(p.i)}: ${pts} points">${pts}</span>`}).join('')}
+  return `<span class="ms${isLight(p.color)?' light':''}${close&&!won()?' close':''}${G.cur===p.i&&!won()?' cur':''}${won()&&G.winner===p.i?' champ':''}" style="background:${p.color}" title="${nm(p.i)}: ${pts} points">${pts}</span>`}).join('')}
 function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
   if(!rs.length){el.innerHTML='<span class="belt-empty">Dice rolls will show here</span>';return}
   el.innerHTML=rs.map((r,k)=>{const p=G.players[r.p],s=r.a+r.b;
@@ -805,7 +824,7 @@ function turnFlash(){if(ME<0||won()||G.cur!==ME)return;
   if(!key||key===L.flashKey)return;L.flashKey=key;
   const el=$('#turnflash'),p=G.players[ME];
   el.textContent=G.phase==='setup'?'Your turn · place a settlement':'Your turn';
-  el.style.setProperty('--pc',p.color);el.classList.toggle('light',ME===3);
+  el.style.setProperty('--pc',p.color);el.classList.toggle('light',isLight(p.color));
   el.hidden=false;el.classList.remove('go');void el.offsetWidth;el.classList.add('go');
   clearTimeout(flashT);flashT=setTimeout(()=>{el.hidden=true;el.classList.remove('go')},1100)}
 function renderOffer(){const o=G.offer,el=$('#offerbar');
@@ -818,7 +837,7 @@ function renderOffer(){const o=G.offer,el=$('#offerbar');
   el.innerHTML=`<span class="sw" style="background:${from.color}"></span><span class="txt">${txt}<br><small>Waiting on: ${waiting.join(', ')||'nobody'}</small></span>${btns}`}
 function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&&!L.flow,main=my&&G.phase==='main'&&L.mode!=='freeRoad'&&!G.offer;
   const s=G.dice?G.dice[0]+G.dice[1]:'';
-  const players=`<section><h2>Players · first to ${WIN}</h2><div class="players">${G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2;return `<div class="pl ${G.cur===p.i&&!won()?'cur':''}"><span class="score ${p.i===3?'light':''} ${close?'close':''}" style="background:${p.color}" title="${pts} points">${pts}</span><b>${nm(p.i)}${isBot(p)?'<span class="botlbl">computer</span>':''}${G.longest===p.i?'<span class="badge">Road</span>':''}${G.army===p.i?'<span class="badge">Army</span>':''}</b><span class="togo ${close?'close':''}">${pts>=WIN?'won':(WIN-pts)+' to win'}</span>
+  const players=`<section><h2>Players · first to ${WIN}</h2><div class="players">${G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2;return `<div class="pl ${G.cur===p.i&&!won()?'cur':''}"><span class="score ${isLight(p.color)?'light':''} ${close?'close':''}" style="background:${p.color}" title="${pts} points">${pts}</span><b>${nm(p.i)}${isBot(p)?'<span class="botlbl">computer</span>':''}${G.longest===p.i?'<span class="badge">Road</span>':''}${G.army===p.i?'<span class="badge">Army</span>':''}</b><span class="togo ${close?'close':''}">${pts>=WIN?'won':(WIN-pts)+' to win'}</span>
     <span class="meta">${cards(p)} cards · ${p.dev.length} dev · ${p.knights} knights · road ${G.lens[p.i]}</span></div>`}).join('')}</div></section>`;
   const logH=`<section><h2>Log</h2><div class="log">${G.log.slice().reverse().map(l=>{const t=(l.secret&&l.secret[ME])||l.text;return l.p===null?`<div class="sys">${t}</div>`:`<div><span class="sw" style="background:${G.players[l.p].color}"></span><span><b>${nm(l.p)}</b> ${t}</span></div>`}).join('')}</div></section>`;
   const dice='';
