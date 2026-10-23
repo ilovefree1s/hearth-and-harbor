@@ -228,6 +228,11 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .csw.on{outline:3px solid var(--ink);outline-offset:2px}
 .csw:disabled{opacity:.25;cursor:not-allowed}
 .csw[data-c="#f2efe6"]{color:var(--ink);text-shadow:none}
+/* "something happened to you" pop-up */
+#alertbox{position:fixed;left:50%;top:calc(14px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:25;width:min(420px,calc(100% - 32px));box-sizing:border-box;
+  background:#b3261e;color:#fff;font-weight:700;font-size:15px;line-height:1.35;padding:12px 16px;border-radius:10px;border:2px solid rgba(0,0,0,.35);box-shadow:0 10px 30px rgba(0,0,0,.4);
+  display:flex;flex-direction:column;gap:4px;pointer-events:none}
+#alertbox[hidden]{display:none}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -238,6 +243,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 <div id="modal" hidden><div class="box"></div></div>
 <div id="toast" class="toast" hidden></div>
 <div id="turnflash" hidden></div>
+<div id="alertbox" role="status" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script>
@@ -352,7 +358,7 @@ function produce(sum){const gains=G.players.map(()=>({}));
   G.tiles.forEach((t,ti)=>{if(t.num!==sum)return;if(ti===G.robber){log(null,`The robber blocks the ${TILE[t.type].name} (${sum}).`);return}
     t.v.forEach(vid=>{const b=G.verts[vid].b;if(b){const n=b.city?2:1;G.players[b.p].res[t.type]+=n;gains[b.p][t.type]=(gains[b.p][t.type]||0)+n}})});
   let any=false;gains.forEach((g,i)=>{const s=fmt(g);if(s){any=true;log(G.players[i],'collected '+s)}});if(!any)log(null,'Nothing produced.')}
-function log(p,text,secret){G.log.push({p:p?p.i:null,text,secret:secret||null});if(G.log.length>70)G.log.splice(0,G.log.length-70)}
+function log(p,text,secret,alert){G.logN=(G.logN||0)+1;G.log.push({n:G.logN,p:p?p.i:null,text,secret:secret||null,alert:alert||null});if(G.log.length>70)G.log.splice(0,G.log.length-70)}
 
 /* ---------- actions (run only on the acting player's device) ---------- */
 function placeSetupSettlement(pi,vid){const p=G.players[pi];G.verts[vid].b={p:pi,city:false};p.setts--;G.lastSett=vid;G.sub='road';
@@ -390,7 +396,7 @@ async function moveRobber(){const p=P();let ti;G.phase='robber';await push();
     else vi=maxBy(vics,i=>vp(G.players[i])+Math.random()*.5);
     const v=G.players[vi],pool=[];RES.forEach(r=>{for(let k=0;k<v.res[r];k++)pool.push(r)});
     if(pool.length){const r=pool[Math.random()*pool.length|0];v.res[r]--;p.res[r]++;
-      log(p,`stole a card from ${pn(v)}`,{[p.i]:`stole 1 ${RN[r]} from ${pn(v)}`,[v.i]:`stole 1 ${RN[r]} from you`})}}
+      log(p,`stole a card from ${pn(v)}`,{[p.i]:`stole 1 ${RN[r]} from ${pn(v)}`,[v.i]:`stole 1 ${RN[r]} from you`},{[v.i]:`${pn(p)} moved the robber and stole 1 ${RN[r]} from you.`})}}
   await push();render()}
 async function playDev(p,type,arg){const idx=p.dev.findIndex(d=>d.type===type&&d.turn<G.turn);p.dev.splice(idx,1);G.devPlayed=true;log(p,`played ${DEV[type][0]}`);
   if(type==='knight'){p.knights++;updateArmy(p);const prev=G.phase;await moveRobber();G.phase=prev}
@@ -401,7 +407,9 @@ async function playDev(p,type,arg){const idx=p.dev.findIndex(d=>d.type===type&&d
     if(!isBot(p)){const opts=RES.map(r=>({label:RN[r],value:r,color:TILE[r].fill}));picks=[await chooseModal('Year of Plenty','Pick your first resource.',opts),await chooseModal('Year of Plenty','Pick your second resource.',opts)]}
     picks.forEach(r=>p.res[r]++);log(p,'took '+picks.map(r=>RN[r]).join(' and '))}
   if(type==='monopoly'){const r=!isBot(p)?await chooseModal('Monopoly','Every opponent hands over all cards of this resource.',RES.map(r=>({label:RN[r],value:r,color:TILE[r].fill}))):arg;
-    let n=0;G.players.forEach(o=>{if(o!==p){n+=o.res[r];o.res[r]=0}});p.res[r]+=n;log(p,`claimed ${n} ${RN[r]}`)}
+    let n=0;const lost={};G.players.forEach(o=>{if(o!==p){const k=o.res[r];n+=k;o.res[r]=0;lost[o.i]=k}});p.res[r]+=n;
+    const al={};Object.entries(lost).forEach(([i,k])=>al[i]=`${pn(p)} played Monopoly and took ${k?'all '+k+' of your '+RN[r]:'everyone’s '+RN[r]+' (you had none)'}.`);
+    log(p,`used Monopoly to take every ${RN[r]} card (${n} in total)`,null,al)}
   checkWin();await push();render()}
 function nextTurn(){G.cur=(G.cur+1)%4;G.turn++;G.phase='roll';G.devPlayed=false;G.dice=null;G.offer=null;G.freeRoads=0;L.mode=null}
 
@@ -745,6 +753,11 @@ function discardModal(k){return new Promise(res=>{const sel=z();
 function showWin(){L.winShown=true;store.set('hh-last','');const w=G.players[G.winner],host=G.host===UID,rows=G.players.map(p=>`<div class="pl"><span class="sw" style="background:${p.color}"></span><b>${nm(p.i)}</b><span class="vp">${vp(p,true)}</span></div>`).join('');
   modal(`<h3>${w.i===ME?'You win the island':pn(w)+' wins the island'}</h3><p>${w.i===ME?'Ten points, fairly earned.':'Better luck on the next map.'}</p><div class="players">${rows}</div><div class="opts">${host?'<button class="primary" data-c="again">Play again</button>':''}<button data-c="close">Look at the board</button><button data-c="home">Back to start</button></div>${host?'':'<p>The host can start a rematch with the same players.</p>'}`,
     b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name,color:p.color}));sync(G,{phase:'lobby',host:G.host,seats,v:G.v})})}else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
+function checkAlerts(){if(!G||!G.log||ME<0)return;const top=G.logN||0;
+  if(L.seenLog==null||L.seenCode!==CODE){L.seenLog=top;L.seenCode=CODE;return}
+  if(top>L.seenLog){const msgs=G.log.filter(l=>l.n>L.seenLog&&l.alert&&l.alert[ME]).map(l=>l.alert[ME]);L.seenLog=top;if(msgs.length)alertBox(msgs)}}
+function alertBox(msgs){const box=$('#alertbox');box.innerHTML=msgs.map(m=>`<div>${m}</div>`).join('');box.hidden=false;
+  clearTimeout(L.alertT);L.alertT=setTimeout(()=>box.hidden=true,6000)}
 let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,3500)}
 
 /* ---------- render ---------- */
@@ -873,7 +886,7 @@ function render(){
   const inGame=G&&G.phase&&G.phase!=='lobby';
   $('#app').hidden=!inGame;$('#lobby').hidden=!!inGame;
   if(!inGame){if(!M.hidden)closeModal();renderLobby();return}
-  renderBoard();renderHud();renderOffer();renderPanel();renderBelt();renderMapScore();turnFlash();
+  renderBoard();renderHud();renderOffer();renderPanel();renderBelt();renderMapScore();checkAlerts();turnFlash();
   if(won()&&!L.winShown)showWin();
   if(G.discards&&G.discards[ME]&&!L.discarding&&!won())promptDiscard()}
 
