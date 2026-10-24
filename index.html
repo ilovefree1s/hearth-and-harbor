@@ -203,7 +203,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .togo{font-size:12px}
 .mapbtn.endturn{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 /* mini scoreboard in the water, top-left of the map */
-.mapscore{position:absolute;top:6px;left:6px;display:grid;grid-template-columns:repeat(2,26px);gap:5px;pointer-events:none}
+.mapscore{position:absolute;top:6px;left:6px;display:flex;flex-direction:column;gap:5px;pointer-events:none}
 .ms{width:26px;height:26px;border-radius:6px;border:2px solid rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;
   font-family:var(--display);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4);box-shadow:0 2px 6px rgba(0,0,0,.35)}
 .ms.light{color:var(--ink);text-shadow:none}
@@ -236,11 +236,26 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .modepick{display:flex;gap:6px}
 .modepick button{flex:1;min-height:44px}
 .modepick button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+/* hand size next to each score square */
+.msrow{display:flex;align-items:center;gap:4px}
+.mc{display:flex;align-items:center;gap:3px;height:20px;padding:0 6px 0 4px;border-radius:999px;background:rgba(10,30,38,.72);color:#fff;font-weight:800;font-size:12.5px;font-variant-numeric:tabular-nums}
+.mc i{width:8px;height:11px;border-radius:2px;background:#f2efe6;border:1px solid rgba(0,0,0,.4);display:block}
+.mc.over{background:#b3261e}
+/* most-rolled numbers, top-right of the map */
+.maphot:empty{display:none}
+.maphot{position:absolute;top:5px;right:5px;background:rgba(10,30,38,.7);border-radius:7px;padding:4px 6px;display:flex;flex-direction:column;gap:1px;pointer-events:none;color:#fff;width:76px;box-sizing:border-box}
+.mh-t{font-size:8.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.75);white-space:nowrap}
+.mh-r{display:grid;grid-template-columns:15px 1fr 11px;align-items:center;gap:3px;font-variant-numeric:tabular-nums;height:13px}
+.mh-r b{font-family:var(--display);font-size:12px;text-align:right;line-height:1}
+.mh-r b.red{color:#ff8f86}.mh-r b.seven{color:#ffd23f}
+.mh-r small{font-size:9.5px;font-weight:700;text-align:right}
+.mh-bar{height:5px;border-radius:3px;background:rgba(255,255,255,.18);overflow:hidden}
+.mh-bar span{display:block;height:100%;background:#fff3b0;border-radius:3px}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
 <div class="app" id="app" hidden>
-  <div class="board-wrap"><header class="hud" id="hud"></header><div id="offerbar"></div><div class="svgbox"><svg id="board" viewBox="-345 -305 690 610" aria-label="Island board"></svg><div class="mapscore" id="mapscore"></div><div class="mapctl" id="mapctl"></div></div><div class="belt" id="belt" aria-label="Recent dice rolls"></div></div>
+  <div class="board-wrap"><header class="hud" id="hud"></header><div id="offerbar"></div><div class="svgbox"><svg id="board" viewBox="-345 -305 690 610" aria-label="Island board"></svg><div class="mapscore" id="mapscore"></div><div class="maphot" id="maphot"></div><div class="mapctl" id="mapctl"></div></div><div class="belt" id="belt" aria-label="Recent dice rolls"></div></div>
   <aside class="panel" id="panel"></aside>
 </div>
 <div id="modal" hidden><div class="box"></div></div>
@@ -389,7 +404,7 @@ function buildSettlement(p,vid){pay(p,COST.settlement);G.verts[vid].b={p:p.i,cit
 function buildCity(p,vid){pay(p,COST.city);G.verts[vid].b.city=true;p.cities--;p.setts++;log(p,'upgraded to a city')}
 function buyDev(p){pay(p,COST.dev);const c=G.deck.pop();p.dev.push({type:c,turn:G.turn});log(p,'bought a development card',{[p.i]:`bought a development card: ${DEV[c][0]}`})}
 
-async function rollDice(){const a=1+(Math.random()*6|0),b=1+(Math.random()*6|0);G.dice=[a,b];(G.rolls=G.rolls||[]).push({p:G.cur,a,b});if(G.rolls.length>12)G.rolls.splice(0,G.rolls.length-12);log(P(),`rolled ${a+b}`);
+async function rollDice(){const a=1+(Math.random()*6|0),b=1+(Math.random()*6|0);G.dice=[a,b];(G.rollCounts=G.rollCounts||{})[a+b]=(G.rollCounts[a+b]||0)+1;(G.rolls=G.rolls||[]).push({p:G.cur,a,b});if(G.rolls.length>12)G.rolls.splice(0,G.rolls.length-12);log(P(),`rolled ${a+b}`);
   if(a+b===7){const need={};
     for(const p of G.players){const n=cards(p);if(n>7){const k=Math.floor(n/2);if(isBot(p)){aiDiscard(p,k);log(p,`discarded ${k} cards`)}else need[p.i]=k}}
     if(Object.keys(need).length){G.discards=need;G.phase='discard';await push();render();
@@ -937,8 +952,14 @@ function renderMapCtl(spect,my,main){const el=$('#mapctl');
   const canEnd=main&&!L.mode&&!locked;
   const armed=canEnd&&Date.now()-(L.endArm||0)<3000;
   el.innerHTML=`<span></span><span class="endwrap">${armed?'<span class="sure">Are you sure?</span>':''}<button class="mapbtn endturn" data-act="end" ${canEnd?'':'disabled'}>End turn</button></span>`}
-function renderMapScore(){$('#mapscore').innerHTML=G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2;
-  return `<span class="ms${isLight(p.color)?' light':''}${close&&!won()?' close':''}${G.cur===p.i&&!won()?' cur':''}${won()&&G.winner===p.i?' champ':''}" style="background:${p.color}" title="${nm(p.i)}: ${pts} points">${pts}</span>`}).join('')}
+function renderMapScore(){
+  $('#mapscore').innerHTML=G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2,n=cards(p);
+    return `<div class="msrow"><span class="ms${isLight(p.color)?' light':''}${close&&!won()?' close':''}${G.cur===p.i&&!won()?' cur':''}${won()&&G.winner===p.i?' champ':''}" style="background:${p.color}" title="${nm(p.i)}: ${pts} points">${pts}</span><span class="mc${n>7?' over':''}" title="${nm(p.i)} holds ${n} card${n===1?'':'s'}"><i aria-hidden="true"></i>${n}</span></div>`}).join('');
+  const counts=G.rollCounts||(G.rolls||[]).reduce((o,r)=>{o[r.a+r.b]=(o[r.a+r.b]||0)+1;return o},{});
+  const top=Object.entries(counts).map(([k,v])=>[+k,v]).sort((a,b)=>b[1]-a[1]||Math.abs(7-a[0])-Math.abs(7-b[0])).slice(0,4);
+  const mx=top.length?top[0][1]:1;
+  $('#maphot').innerHTML=top.length?`<div class="mh-t">Most rolled</div>${top.map(([k,v])=>`<div class="mh-r"><b class="${k===6||k===8?'red':''}${k===7?' seven':''}">${k}</b><span class="mh-bar"><span style="width:${Math.max(12,Math.round(v/mx*100))}%"></span></span><small>${v}</small></div>`).join('')}`:'';
+}
 function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
   if(!rs.length){el.innerHTML='<span class="belt-empty">Dice rolls will show here</span>';return}
   el.innerHTML=rs.map((r,k)=>{const p=G.players[r.p],s=r.a+r.b;
