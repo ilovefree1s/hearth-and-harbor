@@ -328,7 +328,7 @@ function buildGame(seats,host,rules){
   entries.forEach(e=>{if(e.kind==='human'){const s=seats.find(s=>s.uid===e.uid);e.color=s&&s.color}if(!e.color)e.color=botCols.shift()});
   const players=entries.map((e,i)=>({i,name:e.name,kind:e.kind,uid:e.uid,color:e.color,res:z(),dev:[],knights:0,roads:15,setts:5,cities:4}));
   const base=[...Array(14).fill('knight'),...Array(5).fill('vp'),'road','road','plenty','plenty','monopoly','monopoly'];
-  if(rules==='house')Object.entries(HOUSE).forEach(([t,n])=>{for(let k=0;k<n;k++)base.push(t)});
+  if(rules==='house'){base.splice(0,2);Object.entries(HOUSE).forEach(([t,n])=>{for(let k=0;k<n;k++)base.push(t)})}
   const deck=shuffle(base);
   const first=Math.random()*4|0,order=[0,1,2,3].map(i=>(first+i)%4);
   const hostSeat=players.findIndex(p=>p.uid===host);
