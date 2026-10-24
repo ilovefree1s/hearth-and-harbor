@@ -233,6 +233,9 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
   background:#b3261e;color:#fff;font-weight:700;font-size:15px;line-height:1.35;padding:12px 16px;border-radius:10px;border:2px solid rgba(0,0,0,.35);box-shadow:0 10px 30px rgba(0,0,0,.4);
   display:flex;flex-direction:column;gap:4px;pointer-events:none}
 #alertbox[hidden]{display:none}
+.modepick{display:flex;gap:6px}
+.modepick button{flex:1;min-height:44px}
+.modepick button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 </style>
 </head><body>
 <div id="lobby" hidden></div>
@@ -258,7 +261,17 @@ const RES=['wood','brick','wool','grain','ore'];
 const RN={wood:'Timber',brick:'Clay',wool:'Wool',grain:'Grain',ore:'Ore'};
 const TILE={wood:{fill:'#4b7a37',name:'Forest'},brick:{fill:'#b65f37',name:'Clay pits'},wool:{fill:'#93b958',name:'Pasture'},grain:{fill:'#ddb446',name:'Fields'},ore:{fill:'#808a94',name:'Mountains'},desert:{fill:'#d6c38f',name:'Dunes'}};
 const COST={road:{wood:1,brick:1},settlement:{wood:1,brick:1,wool:1,grain:1},city:{grain:2,ore:3},dev:{wool:1,grain:1,ore:1}};
-const DEV={knight:['Knight','Move the robber and steal a card.'],road:['Road Building','Place two roads for free.'],plenty:['Year of Plenty','Take any two resources.'],monopoly:['Monopoly','Claim every card of one resource.'],vp:['Victory Point','Counts toward your score. Kept hidden.']};
+const HOUSE={bomb:2,burn:2,swap:2,highway:2,numswap:2,reset:1,gambler:2,desert:1};
+const HOUSE_DEV={bomb:['The Bomb','Destroy an opponent’s settlement, or knock their city back down to a settlement.'],
+  burn:['Burn It Down!','Destroy any 2 roads on the board.'],
+  swap:['Settlement Swap','Swap one of your settlements with another player’s settlement.'],
+  highway:['Highway Robbery','Take any 4 resources from the bank, or steal 2 random cards from every other player.'],
+  numswap:['Number Swap','Swap the number tokens on any 2 numbered tiles.'],
+  reset:['The Great Reset','Every player, you included, throws away their whole hand.'],
+  gambler:['The Gambler','Roll the dice. 8–12: build a city for free. 2–7: lose one of your own roads.'],
+  desert:['Desert Dominion','Own 3 buildings around the Dunes? Play this to win instantly.']};
+const isHouse=t=>t in HOUSE;
+const DEV={...HOUSE_DEV,knight:['Knight','Move the robber and steal a card.'],road:['Road Building','Place two roads for free.'],plenty:['Year of Plenty','Take any two resources.'],monopoly:['Monopoly','Claim every card of one resource.'],vp:['Victory Point','Counts toward your score. Kept hidden.']};
 const PCOL=['#2f6db3','#c8423b','#e08a2a','#f2efe6'];
 const COLORS=[{c:'#2f6db3',n:'Blue'},{c:'#c8423b',n:'Red'},{c:'#e08a2a',n:'Orange'},{c:'#f2efe6',n:'White'},{c:'#7d4fb8',n:'Purple'},{c:'#d9549a',n:'Pink'}];
 const isLight=c=>c==='#f2efe6';
@@ -285,7 +298,7 @@ const UID=store.get('hh-uid')||(()=>{const u=Math.random().toString(36).slice(2,
 let MYNAME=store.get('hh-name')||'';let MYCOLOR=store.get('hh-color')||COLORS[0].c;L.nameDraft=MYNAME;
 
 /* ---------- board setup ---------- */
-function buildGame(seats,host){
+function buildGame(seats,host,rules){
   const coords=[];for(let q=-2;q<=2;q++)for(let r=-2;r<=2;r++)if(Math.abs(q+r)<=2)coords.push([q,r]);
   let tiles;
   for(let t=0;t<800;t++){
@@ -314,13 +327,15 @@ function buildGame(seats,host){
   const used=seats.map(s=>s.color).filter(Boolean);const botCols=[...PCOL,...COLORS.map(x=>x.c)].filter((c,k,a)=>a.indexOf(c)===k&&!used.includes(c));
   entries.forEach(e=>{if(e.kind==='human'){const s=seats.find(s=>s.uid===e.uid);e.color=s&&s.color}if(!e.color)e.color=botCols.shift()});
   const players=entries.map((e,i)=>({i,name:e.name,kind:e.kind,uid:e.uid,color:e.color,res:z(),dev:[],knights:0,roads:15,setts:5,cities:4}));
-  const deck=shuffle([...Array(14).fill('knight'),...Array(5).fill('vp'),'road','road','plenty','plenty','monopoly','monopoly']);
+  const base=[...Array(14).fill('knight'),...Array(5).fill('vp'),'road','road','plenty','plenty','monopoly','monopoly'];
+  if(rules==='house')Object.entries(HOUSE).forEach(([t,n])=>{for(let k=0;k<n;k++)base.push(t)});
+  const deck=shuffle(base);
   const first=Math.random()*4|0,order=[0,1,2,3].map(i=>(first+i)%4);
   const hostSeat=players.findIndex(p=>p.uid===host);
   const st={phase:'setup',host,tiles,verts,edges,ports,players,deck,robber:tiles.findIndex(t=>t.type==='desert'),
     setupOrder:[...order,...order.slice().reverse()],setupIdx:0,cur:first,first,sub:'settlement',lastSett:null,
     turn:0,dice:null,devPlayed:false,longest:null,lens:[0,0,0,0],army:null,log:[],winner:null,freeRoads:0,
-    discards:null,offer:null,botRunner:hostSeat<0?0:hostSeat};
+    discards:null,offer:null,rules:rules==='house'?'house':'classic',botRunner:hostSeat<0?0:hostSeat};
   st.log.push({p:null,text:`Seats were drawn at random. ${esc(players[first].name)} goes first. Everyone places two settlements, each with a road.`});
   return st;
 }
@@ -341,7 +356,10 @@ function canRoad(eid,pi){const e=G.edges[eid];if(e.road!==null)return false;
   return [e.a,e.b].some(vid=>{const v=G.verts[vid];if(v.b)return v.b.p===pi;return v.edges.some(x=>x!==eid&&G.edges[x].road===pi)})}
 const canCity=(vid,pi)=>{const b=G.verts[vid].b;return b&&b.p===pi&&!b.city};
 function rate(pi,r){let k=4;G.verts.forEach(v=>{if(v.b&&v.b.p===pi&&v.port){if(v.port==='any')k=Math.min(k,3);else if(v.port===r)k=2}});return k}
-const canPlayDev=(p,t)=>t!=='vp'&&!G.devPlayed&&p.dev.some(d=>d.type===t&&d.turn<G.turn);
+const desertTile=()=>G.tiles.findIndex(t=>t.type==='desert');
+const desertCount=pi=>{const ti=desertTile();return ti<0?0:G.tiles[ti].v.filter(v=>G.verts[v].b&&G.verts[v].b.p===pi).length};
+const canPlayDev=(p,t)=>{if(t==='vp')return false;if(t==='desert')return desertCount(p.i)>=3&&p.dev.some(d=>d.type==='desert');
+  return !G.devPlayed&&p.dev.some(d=>d.type===t&&d.turn<G.turn)};
 const fmt=g=>Object.entries(g).filter(([,n])=>n>0).map(([r,n])=>n+' '+RN[r]).join(', ');
 function prodOf(p){const o=z();G.verts.forEach(v=>{if(v.b&&v.b.p===p.i)v.hexes.forEach(ti=>{const t=G.tiles[ti];if(t.type!=='desert')o[t.type]+=pips(t.num)*(v.b.city?2:1)})});return o}
 function longestFor(pi){let best=0;
@@ -398,7 +416,7 @@ async function moveRobber(){const p=P();let ti;G.phase='robber';await push();
     if(pool.length){const r=pool[Math.random()*pool.length|0];v.res[r]--;p.res[r]++;
       log(p,`stole a card from ${pn(v)}`,{[p.i]:`stole 1 ${RN[r]} from ${pn(v)}`,[v.i]:`stole 1 ${RN[r]} from you`},{[v.i]:`${pn(p)} moved the robber and stole 1 ${RN[r]} from you.`})}}
   await push();render()}
-async function playDev(p,type,arg){const idx=p.dev.findIndex(d=>d.type===type&&d.turn<G.turn);p.dev.splice(idx,1);G.devPlayed=true;log(p,`played ${DEV[type][0]}`);
+async function playDev(p,type,arg){if(isHouse(type)){await playHouse(p,type,arg);return}const idx=p.dev.findIndex(d=>d.type===type&&d.turn<G.turn);p.dev.splice(idx,1);G.devPlayed=true;log(p,`played ${DEV[type][0]}`);
   if(type==='knight'){p.knights++;updateArmy(p);const prev=G.phase;await moveRobber();G.phase=prev}
   if(type==='road'){
     if(!isBot(p)){G.freeRoads=Math.min(2,p.roads);L.mode='freeRoad';if(!hotEdges().size){L.mode=null;G.freeRoads=0}}
@@ -411,6 +429,90 @@ async function playDev(p,type,arg){const idx=p.dev.findIndex(d=>d.type===type&&d
     const al={};Object.entries(lost).forEach(([i,k])=>al[i]=`${pn(p)} played Monopoly and took ${k?'all '+k+' of your '+RN[r]:'everyone’s '+RN[r]+' (you had none)'}.`);
     log(p,`used Monopoly to take every ${RN[r]} card (${n} in total)`,null,al)}
   checkWin();await push();render()}
+/* ---------- House Rules cards ---------- */
+const owned=(pi,cityOk)=>G.verts.filter(v=>v.b&&v.b.p===pi&&(cityOk||!v.b.city));
+const oppBuildings=pi=>G.verts.filter(v=>v.b&&v.b.p!==pi);
+async function pickOn(kind,ids,prompt){if(!ids.length)return null;L.pick={kind,set:new Set(ids),prompt};render();
+  const id=await new Promise(r=>L.pick.resolve=r);L.pick=null;render();return id}
+async function pickConfirm(kind,ids,prompt,title,textFn,okLabel){for(;;){const id=await pickOn(kind,ids,prompt);if(id==null)return null;
+  if(kind==='vert')L.vertPreview=id;else if(kind==='edge')L.edgePreview=id;else L.robberPreview=id;render();
+  const ok=await chooseModal(title,textFn(id),[{label:okLabel,value:true},{label:'Pick another',value:false}],true);
+  L.vertPreview=null;L.edgePreview=null;L.robberPreview=null;render();if(ok)return id}}
+const bName=v=>v.b.city?'city':'settlement';
+const tileName=ti=>{const t=G.tiles[ti];return `${TILE[t.type].name}${t.num?' ('+t.num+')':''}`};
+const ownerChip=i=>`<span class="chip${isLight(G.players[i].color)?' light':''}" style="background:${G.players[i].color}">${nm(i)}</span>`;
+function removeRoad(eid){const e=G.edges[eid];if(e.road==null)return;G.players[e.road].roads++;e.road=null}
+const leaderScore=pi=>vp(G.players[pi])+cards(G.players[pi])*0.15;
+async function playHouse(p,type,arg){
+  const idx=p.dev.findIndex(d=>d.type===type&&(type==='desert'||d.turn<G.turn));if(idx<0)return;
+  p.dev.splice(idx,1);if(type!=='desert')G.devPlayed=true;
+  const human=!isBot(p),A={};
+  log(p,`played ${DEV[type][0]}`);
+  if(type==='desert'){if(desertCount(p.i)>=3){G.winner=p.i;L.mode=null;log(p,`ruled the Dunes with Desert Dominion and won the game!`)}}
+  if(type==='bomb'){const targets=oppBuildings(p.i).map(v=>v.id);let vid=arg;
+    if(human)vid=await pickConfirm('vert',targets,'The Bomb: tap an opponent’s settlement or city.','Drop The Bomb here?',id=>{const v=G.verts[id];return `${ownerChip(v.b.p)}’s ${bName(v)} ${v.b.city?'gets knocked down to a settlement.':'is destroyed.'}`},'Drop it');
+    if(vid!=null){const v=G.verts[vid],o=G.players[v.b.p];
+      if(v.b.city&&o.setts>0){v.b.city=false;o.cities++;o.setts--;log(p,`bombed ${pn(o)}’s city down to a settlement`,null,{[o.i]:`${pn(p)} dropped The Bomb on your city. It’s a settlement now.`})}
+      else if(v.b.city){v.b=null;o.cities++;log(p,`bombed ${pn(o)}’s city off the map (they had no settlement left to put back)`,null,{[o.i]:`${pn(p)} dropped The Bomb on your city. With no spare settlement piece, it was destroyed.`})}
+      else{v.b=null;o.setts++;log(p,`bombed ${pn(o)}’s settlement off the map`,null,{[o.i]:`${pn(p)} dropped The Bomb and destroyed one of your settlements.`})}
+      updateLongest()}}
+  if(type==='burn'){let picks=arg||[];
+    if(human){picks=[];for(let k=0;k<2;k++){const rs=G.edges.filter(e=>e.road!=null&&!picks.includes(e.id)).map(e=>e.id);if(!rs.length)break;
+      const id=await pickConfirm('edge',rs,`Burn It Down: tap road ${k+1} of 2 to destroy.`,'Burn this road?',id=>`${ownerChip(G.edges[id].road)}’s road goes up in flames.`,'Burn it');if(id==null)break;picks.push(id)}}
+    const al={};picks.forEach(id=>{const o=G.edges[id].road;if(o==null)return;removeRoad(id);if(o!==p.i)al[o]=(al[o]?al[o]+' ':'')+`${pn(p)} burned down one of your roads.`});
+    log(p,`burned down ${picks.length} road${picks.length===1?'':'s'}`,null,al);updateLongest()}
+  if(type==='swap'){let mine=arg&&arg[0],theirs=arg&&arg[1];
+    if(human){mine=await pickConfirm('vert',owned(p.i,false).map(v=>v.id),'Settlement Swap: tap one of YOUR settlements.','Swap this settlement away?',id=>`Your settlement on ${G.verts[id].hexes.map(tileName).join(', ')}`,'Use this one');
+      if(mine!=null)theirs=await pickConfirm('vert',G.verts.filter(v=>v.b&&!v.b.city&&v.b.p!==p.i).map(v=>v.id),'Settlement Swap: now tap another player’s settlement.','Swap with this settlement?',id=>`You take ${ownerChip(G.verts[id].b.p)}’s settlement on ${G.verts[id].hexes.map(tileName).join(', ')}, and they get yours.`,'Swap')}
+    if(mine!=null&&theirs!=null){const a=G.verts[mine],b=G.verts[theirs],o=G.players[b.b.p];a.b.p=o.i;b.b.p=p.i;
+      log(p,`swapped settlements with ${pn(o)}`,null,{[o.i]:`${pn(p)} used Settlement Swap. One of your settlements traded places with theirs.`});updateLongest()}}
+  if(type==='highway'){let mode=arg&&arg.mode,picks=arg&&arg.picks;
+    if(human){mode=await chooseModal('Highway Robbery','Choose one:',[{label:'Take 4 from the bank',value:'bank'},{label:'Steal 2 from everyone',value:'steal'}]);
+      if(mode==='bank'){picks=[];const opts=RES.map(r=>({label:RN[r],value:r,color:TILE[r].fill}));for(let k=0;k<4;k++)picks.push(await chooseModal('Highway Robbery',`Pick resource ${k+1} of 4.${picks.length?' So far: '+picks.map(r=>RN[r]).join(', '):''}`,opts))}}
+    if(mode==='bank'){picks.forEach(r=>p.res[r]++);log(p,`took ${picks.map(r=>RN[r]).join(', ')} from the bank`)}
+    else{G.players.forEach(o=>{if(o===p)return;const got=[];for(let k=0;k<2;k++){const pool=[];RES.forEach(r=>{for(let j=0;j<o.res[r];j++)pool.push(r)});if(!pool.length)break;const r=pool[Math.random()*pool.length|0];o.res[r]--;p.res[r]++;got.push(r)}
+      if(got.length)A[o.i]=`${pn(p)} pulled a Highway Robbery and stole ${got.map(r=>'1 '+RN[r]).join(' and ')} from you.`});
+      log(p,'robbed every player of 2 cards',null,A)}}
+  if(type==='numswap'){let a=arg&&arg[0],b=arg&&arg[1];const nums=G.tiles.map((t,i)=>t.num?i:-1).filter(i=>i>=0);
+    if(human){a=await pickConfirm('tile',nums,'Number Swap: tap the first numbered tile.','Swap this number?',id=>tileName(id),'Use this tile');
+      if(a!=null)b=await pickConfirm('tile',nums.filter(i=>i!==a),`Number Swap: tap the tile to trade with ${tileName(a)}.`,'Swap these numbers?',id=>`${tileName(a)} ⇄ ${tileName(id)}`,'Swap')}
+    if(a!=null&&b!=null){const x=G.tiles[a].num;G.tiles[a].num=G.tiles[b].num;G.tiles[b].num=x;log(p,`swapped the numbers on the ${tileName(b)} and ${tileName(a)}`)}}
+  if(type==='reset'){G.players.forEach(o=>{const n=cards(o);RES.forEach(r=>o.res[r]=0);if(o!==p&&n)A[o.i]=`${pn(p)} played The Great Reset. You threw away all ${n} of your cards.`});
+    log(p,'wiped out every hand with The Great Reset',null,A)}
+  if(type==='gambler'){const d1=1+(Math.random()*6|0),d2=1+(Math.random()*6|0),s=d1+d2,win=s>=8;
+    if(human)await chooseModal(`The Gambler rolled ${s}`,`${d1} + ${d2}. ${win?'Build a city for free!':'You lose one of your own roads.'}`,[{label:'OK',value:1}]);
+    if(win){const vs=G.verts.filter(v=>canCity(v.id,p.i)).map(v=>v.id);
+      if(!vs.length||p.cities<=0)log(p,`gambled a ${s} but had no settlement to upgrade`);
+      else{const vid=human?await pickConfirm('vert',vs,'The Gambler: tap a settlement to make a free city.','Upgrade this one?',()=>'Free city, no cards needed.','Upgrade'):maxBy(vs,id=>vScore(G.verts[id],p));
+        const v=G.verts[vid];v.b.city=true;p.cities--;p.setts++;log(p,`gambled a ${s} and built a free city`)}}
+    else{const rs=G.edges.filter(e=>e.road===p.i).map(e=>e.id);
+      if(!rs.length)log(p,`gambled a ${s} but had no roads to lose`);
+      else{const eid=human?await pickConfirm('edge',rs,'The Gambler: tap one of your roads to lose.','Lose this road?',()=>'This road is removed.','Remove it'):aiWorstRoad(p,rs);
+        removeRoad(eid);log(p,`gambled a ${s} and lost a road`);updateLongest()}}}
+  checkWin();await push();render()}
+function aiWorstRoad(p,rs){return maxBy(rs,id=>{const e=G.edges[id];let s=Math.random()*.2;[e.a,e.b].forEach(v=>{const V=G.verts[v];if(V.b&&V.b.p===p.i)s-=1;s-=V.edges.filter(x=>x!==id&&G.edges[x].road===p.i).length*.6});return s})}
+/* what a computer player does with a House Rules card (returns true if it played one) */
+async function aiHouse(p){
+  const has=t=>canPlayDev(p,t);
+  if(has('desert')){await playHouse(p,'desert');return true}
+  if(G.devPlayed)return false;
+  const others=G.players.filter(o=>o!==p),lead=maxBy(others,o=>leaderScore(o.i));
+  if(has('bomb')){const ts=oppBuildings(p.i);if(ts.length){const v=maxBy(ts,v=>(v.b.p===lead.i?3:0)+(v.b.city?1:0)+v.hexes.reduce((s,ti)=>s+pips(G.tiles[ti].num),0)*0.1);await playHouse(p,'bomb',v.id);return true}}
+  if(has('highway')){const pool=others.reduce((s,o)=>s+Math.min(2,cards(o)),0);
+    if(pool>=4){await playHouse(p,'highway',{mode:'steal'});return true}
+    const m=missing(p,COST[goal(p)]),picks=[];RES.forEach(r=>{for(let k=0;k<(m[r]||0);k++)picks.push(r)});while(picks.length<4)picks.push(['grain','ore','wool','wood','brick'][picks.length%5]);
+    await playHouse(p,'highway',{mode:'bank',picks:picks.slice(0,4)});return true}
+  if(has('burn')){const rs=G.edges.filter(e=>e.road===lead.i).map(e=>e.id);const any=G.edges.filter(e=>e.road!=null&&e.road!==p.i).map(e=>e.id);
+    const picks=shuffle(rs.length>=2?rs:any).slice(0,2);if(picks.length){await playHouse(p,'burn',picks);return true}}
+  if(has('swap')){const mine=owned(p.i,false),theirs=G.verts.filter(v=>v.b&&!v.b.city&&v.b.p!==p.i);
+    if(mine.length&&theirs.length){const a=maxBy(mine,v=>-vScore(v,p)),b=maxBy(theirs,v=>vScore(v,p));if(vScore(b,p)-vScore(a,p)>2){await playHouse(p,'swap',[a.id,b.id]);return true}}}
+  if(has('numswap')){const mineT=new Set();owned(p.i,true).forEach(v=>v.hexes.forEach(ti=>mineT.add(ti)));
+    const nums=G.tiles.map((t,i)=>i).filter(i=>G.tiles[i].num);const low=maxBy(nums.filter(i=>mineT.has(i)),i=>-pips(G.tiles[i].num));
+    const high=maxBy(nums.filter(i=>!mineT.has(i)),i=>pips(G.tiles[i].num));
+    if(low!=null&&high!=null&&pips(G.tiles[high].num)-pips(G.tiles[low].num)>=2){await playHouse(p,'numswap',[low,high]);return true}}
+  if(has('reset')){const mine=cards(p),theirs=others.reduce((s,o)=>s+cards(o),0);if(mine<=2&&theirs>=10){await playHouse(p,'reset');return true}}
+  if(has('gambler')&&p.cities>0&&G.verts.some(v=>canCity(v.id,p.i))){await playHouse(p,'gambler');return true}
+  return false}
 function nextTurn(){G.cur=(G.cur+1)%4;G.turn++;G.phase='roll';G.devPlayed=false;G.dice=null;G.offer=null;G.freeRoads=0;L.mode=null}
 
 /* ---------- computer players ---------- */
@@ -447,6 +549,7 @@ function aiRobberHex(pi){const lead=Math.max(...G.players.map(p=>vp(p)));
     t.v.forEach(vid=>{const b=G.verts[vid].b;if(!b)return;if(b.p===pi)s-=100;else{const o=G.players[b.p];s+=pips(t.num)*(b.city?2:1)*(1+vp(o)/5)*(vp(o)===lead?1.4:1)}});return[i,s]}).sort((a,b)=>b[1]-a[1])[0][0]}
 const robberHurts=pi=>G.tiles[G.robber].v.some(v=>G.verts[v].b&&G.verts[v].b.p===pi);
 async function aiAct(p){
+  if(G.rules==='house'&&await aiHouse(p))return true;
   if(!G.devPlayed){
     if(canPlayDev(p,'knight')&&(robberHurts(p.i)||(p.knights>=2&&G.army!==p.i))){await playDev(p,'knight');return true}
     const spot=G.verts.some(v=>canSettle(v.id,p.i,false));
@@ -556,12 +659,14 @@ function resolveOffer(){const o=G&&G.offer;if(!o||o.from!==ME||o.resolving)retur
 /* ---------- local input ---------- */
 const myTurn=()=>ME>=0&&G.cur===ME&&!won()&&G.phase!=='discard';
 function hotVerts(){const s=new Set();if(!myTurn())return s;
+  if(L.pick)return L.pick.kind==='vert'?new Set(L.pick.set):s;
   if(G.phase==='setup'&&G.sub==='settlement')G.verts.forEach(v=>{if(canSettle(v.id,ME,true))s.add(v.id)});
   else if(L.mode==='settlement')G.verts.forEach(v=>{if(canSettle(v.id,ME,false))s.add(v.id)});
   else if(L.mode==='city')G.verts.forEach(v=>{if(canCity(v.id,ME))s.add(v.id)});return s}
 function hotEdges(){const s=new Set();if(!myTurn())return s;
+  if(L.pick)return L.pick.kind==='edge'?new Set(L.pick.set):s;
   if((G.phase==='setup'&&G.sub==='road')||L.mode==='road'||L.mode==='freeRoad')G.edges.forEach(e=>{if(canRoad(e.id,ME))s.add(e.id)});return s}
-function hotTiles(){const s=new Set();if(L.mode==='robber'&&myTurn())G.tiles.forEach((t,i)=>{if(i!==G.robber)s.add(i)});return s}
+function hotTiles(){const s=new Set();if(L.pick)return L.pick.kind==='tile'&&myTurn()?new Set(L.pick.set):s;if(L.mode==='robber'&&myTurn())G.tiles.forEach((t,i)=>{if(i!==G.robber)s.add(i)});return s}
 function setupSpotInfo(id){const v=G.verts[id],second=G.setupIdx>=4;
   const tiles=v.hexes.map(ti=>G.tiles[ti]);
   const touch=tiles.map(t=>`<span class="chip${t.type==='desert'?' light':''}" style="background:${TILE[t.type].fill}">${t.type==='desert'?'Dunes':RN[t.type]}${t.num?' · '+t.num:''}</span>`).join(' ');
@@ -574,6 +679,7 @@ const costTxt=c=>Object.entries(c).map(([r,n])=>n+' '+RN[r]).join(', ');
 async function confirmBuild(title,text,okLabel){if(L.confirming)return false;L.confirming=true;render();
   try{return await chooseModal(title,text,[{label:okLabel,value:true},{label:'Cancel',value:false}],true)}finally{L.confirming=false}}
 async function onVertex(id){const me=G.players[ME];if(!hotVerts().has(id))return;
+  if(L.pick){if(!M.hidden)return;const r=L.pick.resolve;r(id);return}
   if(G.phase==='setup'){
     if(L.confirming)return;L.confirming=true;L.vertPreview=id;render();
     const ok=await chooseModal(`Place your ${G.setupIdx>=4?'second':'first'} settlement here?`,setupSpotInfo(id),[{label:'Place settlement',value:true},{label:'Pick another spot',value:false}],true);
@@ -587,6 +693,7 @@ async function onVertex(id){const me=G.players[ME];if(!hotVerts().has(id))return
   if(L.mode==='settlement')buildSettlement(me,id);else if(L.mode==='city')buildCity(me,id);
   L.mode=null;checkWin();render();await push()}
 async function onEdge(id){const me=G.players[ME];if(!hotEdges().has(id))return;
+  if(L.pick){if(!M.hidden)return;const r=L.pick.resolve;r(id);return}
   if(G.phase==='setup'){placeSetupRoad(ME,id);G.botRunner=ME;render();await push();afterChange();return}
   if(L.mode==='road'){L.edgePreview=id;
     const ok=await confirmBuild('Build a road here?',`Costs <b>${costTxt(COST.road)}</b>.`,'Build road');
@@ -595,7 +702,7 @@ async function onEdge(id){const me=G.players[ME];if(!hotEdges().has(id))return;
     buildRoad(me,id);L.mode=null}
   else if(L.mode==='freeRoad'){buildRoad(me,id,true);G.freeRoads--;if(G.freeRoads<=0||!hotEdges().size){L.mode=null;G.freeRoads=0}}
   checkWin();render();await push()}
-function onTile(id){if(hotTiles().has(id)&&L.robberResolve){const r=L.robberResolve;L.robberResolve=null;r(id)}}
+function onTile(id){if(L.pick&&hotTiles().has(id)){if(M.hidden)L.pick.resolve(id);return}if(hotTiles().has(id)&&L.robberResolve){const r=L.robberResolve;L.robberResolve=null;r(id)}}
 $('#board').addEventListener('click',e=>{const t=e.target.closest('[data-v],[data-e],[data-t]');if(!t)return;
   if(t.dataset.v)onVertex(+t.dataset.v);else if(t.dataset.e)onEdge(+t.dataset.e);else onTile(+t.dataset.t)});
 
@@ -651,7 +758,9 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
   if(a==='buydev'){const ok=await confirmBuild('Buy a development card?',`Costs <b>${costTxt(COST.dev)}</b>. You draw a random card: a Knight, Victory Point, Road Building, Year of Plenty or Monopoly.`,'Buy card');
     if(!ok||!myTurn()||G.phase!=='main'||!afford(me,COST.dev)||!G.deck.length){render();return}
     buyDev(me);checkWin();render();await push();return}
-  if(a.startsWith('play-')){L.flow=true;L.mode=null;render();try{await playDev(me,a.slice(5))}finally{L.flow=false}render();return}
+  if(a.startsWith('play-')){const t=a.slice(5);
+    if(isHouse(t)){const ok=await confirmBuild(`Play ${DEV[t][0]}?`,DEV[t][1],'Play it');if(!ok||!canPlayDev(me,t)||!myTurn()){render();return}}
+    L.flow=true;L.mode=null;render();try{await playDev(me,t)}finally{L.flow=false;L.pick=null}render();return}
   if(a==='bank'){const{bg,bt}=L.ui,k=rate(ME,bg);me.res[bg]-=k;me.res[bt]++;log(me,`traded ${k} ${RN[bg]} to the bank for 1 ${RN[bt]}`);render();await push();return}
   if(a==='tr'){const side=b.dataset.side,other=side==='give'?'get':'give',r=b.dataset.r,d=+b.dataset.d,u=L.ui;
     u[side][r]=Math.max(0,u[side][r]+d);if(side==='give')u.give[r]=Math.min(u.give[r],me.res[r]);if(u[side][r])u[other][r]=0;render();return}
@@ -684,14 +793,15 @@ $('#lobby').addEventListener('click',async e=>{const b=e.target.closest('[data-l
   if(a==='pickcolor'){const c=b.dataset.c;MYCOLOR=c;store.set('hh-color',c);
     if(G&&G.phase==='lobby'&&G.seats.some(s=>s.uid===UID)){await mutate(()=>{if(G.phase!=='lobby')return false;const s=G.seats.find(s=>s.uid===UID);
       if(!s||G.seats.some(x=>x!==s&&x.color===c))return false;s.color=c})}else render();return}
+  if(a==='rules'){await mutate(()=>{if(G.phase!=='lobby'||G.host!==UID)return false;G.rules=b.dataset.r});return}
   if(a==='joinseat'){if(!setName())return;await joinSeat();return}
-  if(a==='start'){await mutate(()=>{if(G.phase!=='lobby'||G.host!==UID)return false;const ng=buildGame(G.seats,G.host);ng.v=G.v;sync(G,ng)});return}
+  if(a==='start'){await mutate(()=>{if(G.phase!=='lobby'||G.host!==UID)return false;const ng=buildGame(G.seats,G.host,G.rules);ng.v=G.v;sync(G,ng)});return}
   if(a==='copy'){copyLink();return}
   if(a==='fs'){toggleFullscreen();return}
   if(a==='leave'){await quitGame()}
 });
 async function createGame(n){
-  for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n,color:MYCOLOR}],created:Date.now(),joined:false,v:1};
+  for(let i=0;i<4;i++){const code=newCode();const st={phase:'lobby',host:UID,seats:[{uid:UID,name:n,color:MYCOLOR}],rules:'classic',created:Date.now(),joined:false,v:1};
     const{error}=await sb.from('hh_games').insert({id:code,state:st,v:1});
     if(!error){await connect(code);return}
     if(!String(error.code).startsWith('23')){L.err='Could not create the game: '+esc(error.message);render();return}}}
@@ -717,7 +827,7 @@ function renderLobby(){const el=$('#lobby');let h;
     <button class="primary" data-l="quick">Quick join</button>
     <p style="font-size:13px;margin-top:-6px">Jumps into a game that's waiting for players, or starts a new one if none is open.</p>
     ${L.open&&L.open.length?`<div><label>Open games</label><div class="seats">${L.open.map(r=>{const host=r.state.seats.find(s=>s.uid===r.state.host)||r.state.seats[0];
-      const mine=r.state.seats.some(s=>s.uid===UID);return `<div class="seat"><b>${esc(host?host.name:'Someone')}'s game</b>${mine?' <span class="tag" style="margin-left:6px">You\'re in this one</span>':''}<span class="tag" style="margin-left:6px">${r.state.seats.length} of 4</span><button style="margin-left:auto" data-l="openjoin" data-id="${esc(r.id)}">Join</button></div>`}).join('')}</div></div>`:'<p style="font-size:13px">No open games right now.</p>'}
+      const mine=r.state.seats.some(s=>s.uid===UID);return `<div class="seat"><b>${esc(host?host.name:'Someone')}'s game</b>${mine?' <span class="tag" style="margin-left:6px">You\'re in this one</span>':''}<span class="tag" style="margin-left:6px">${r.state.seats.length} of 4${r.state.rules==='house'?' · House Rules':''}</span><button style="margin-left:auto" data-l="openjoin" data-id="${esc(r.id)}">Join</button></div>`}).join('')}</div></div>`:'<p style="font-size:13px">No open games right now.</p>'}
     <div class="or">or</div>
     <button data-l="create">Start a new game</button>
     <div class="or">join with a code</div>
@@ -728,6 +838,9 @@ function renderLobby(){const el=$('#lobby');let h;
     <div class="seats">${G.seats.map(s=>`<div class="seat"><span class="sw" style="background:${s.color||'#ccc'}"></span><b>${esc(s.name)}</b>${s.uid===UID?' (you)':''}${s.uid===G.host?'<span class="tag">Host</span>':''}</div>`).join('')}
       ${Array(bots).fill(0).map(()=>`<div class="seat bot">Computer player</div>`).join('')}</div>
     ${colorPicker(G.seats.filter(s=>s.uid!==UID).map(s=>s.color))}
+    <div><label>Game mode</label>${host?`<div class="modepick"><button type="button" data-l="rules" data-r="classic" class="${G.rules!=='house'?'on':''}" aria-pressed="${G.rules!=='house'}">Classic</button><button type="button" data-l="rules" data-r="house" class="${G.rules==='house'?'on':''}" aria-pressed="${G.rules==='house'}">House Rules</button></div>`
+      :`<div><b>${G.rules==='house'?'House Rules':'Classic'}</b> <span style="color:var(--muted)">· the host picks</span></div>`}
+      ${G.rules==='house'?`<p style="font-size:13px;margin-top:6px">Adds ${Object.values(HOUSE).reduce((a,b)=>a+b,0)} wild cards to the development deck: ${Object.keys(HOUSE).map(t=>DEV[t][0]).join(', ')}.</p>`:''}</div>
     <p>Up to 4 people. Empty seats are played by the computer, and seats are drawn at random when the game starts.</p>
     ${seated?'':`<div class="lrow"><div><label for="nm">Your name</label><input id="nm" maxlength="16" value="${esc(L.nameDraft)}"></div><button class="primary" data-l="joinseat" ${G.seats.length>=4?'disabled':''}>Join</button></div>`}
     ${host&&closesIn()!==null?`<p><b>Room closes in <span id="countdown">${Math.ceil(closesIn()/1000)}</span>s</b> if nobody joins. You can start now and play against computer players.</p>`:''}
@@ -752,7 +865,7 @@ function discardModal(k){return new Promise(res=>{const sel=z();
   draw()})}
 function showWin(){L.winShown=true;store.set('hh-last','');const w=G.players[G.winner],host=G.host===UID,rows=G.players.map(p=>`<div class="pl"><span class="sw" style="background:${p.color}"></span><b>${nm(p.i)}</b><span class="vp">${vp(p,true)}</span></div>`).join('');
   modal(`<h3>${w.i===ME?'You win the island':pn(w)+' wins the island'}</h3><p>${w.i===ME?'Ten points, fairly earned.':'Better luck on the next map.'}</p><div class="players">${rows}</div><div class="opts">${host?'<button class="primary" data-c="again">Play again</button>':''}<button data-c="close">Look at the board</button><button data-c="home">Back to start</button></div>${host?'':'<p>The host can start a rematch with the same players.</p>'}`,
-    b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name,color:p.color}));sync(G,{phase:'lobby',host:G.host,seats,v:G.v})})}else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
+    b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name,color:p.color}));sync(G,{phase:'lobby',host:G.host,seats,rules:G.rules,v:G.v})})}else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
 function checkAlerts(){if(!G||!G.log||ME<0)return;const top=G.logN||0;
   if(L.seenLog==null||L.seenCode!==CODE){L.seenLog=top;L.seenCode=CODE;return}
   if(top>L.seenLog){const msgs=G.log.filter(l=>l.n>L.seenLog&&l.alert&&l.alert[ME]).map(l=>l.alert[ME]);L.seenLog=top;if(msgs.length)alertBox(msgs)}}
@@ -791,7 +904,7 @@ function renderBoard(){const hv=hotVerts(),he=hotEdges(),ht=hotTiles();let s=PAT
     s+=`<path transform="translate(${v.x.toFixed(1)},${v.y.toFixed(1)})" d="${v.b.city?'M-12 8V-4L-5-10L2-4V-1H12V8Z':'M-8 6V-3L0-10L8-3V6Z'}" fill="${c}" stroke="#1d1a17" stroke-width="2" stroke-linejoin="round"/>`});
   if(L.edgePreview!=null){const e=G.edges[L.edgePreview],A=G.verts[e.a],B=G.verts[e.b];s+=`<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="#111" stroke-width="15" stroke-linecap="round"/><line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" stroke="${G.players[ME].color}" stroke-width="9" stroke-linecap="round"/>`}
   if(L.vertPreview!=null){const v=G.verts[L.vertPreview];s+=`<circle cx="${v.x}" cy="${v.y}" r="13" fill="var(--hot)" stroke="#1d2a2f" stroke-width="3"/>`}
-  hv.forEach(id=>{const v=G.verts[id];s+=`<circle cx="${v.x}" cy="${v.y}" r="${L.mode==='city'?14:8}" class="hot-v pulse" ${L.mode==='city'?'fill-opacity=".35"':''}/><circle cx="${v.x}" cy="${v.y}" r="16" class="hit" data-v="${id}"><title>${L.mode==='city'?'Upgrade to a city':'Build a settlement here'}</title></circle>`});
+  hv.forEach(id=>{const v=G.verts[id];s+=`<circle cx="${v.x}" cy="${v.y}" r="${(L.mode==='city'||L.pick)?14:8}" class="hot-v pulse" ${(L.mode==='city'||L.pick)?'fill-opacity=".35"':''}/><circle cx="${v.x}" cy="${v.y}" r="16" class="hit" data-v="${id}"><title>${L.pick?'Choose this':L.mode==='city'?'Upgrade to a city':'Build a settlement here'}</title></circle>`});
   $('#board').innerHTML=s}
 function die(n){if(!n)return `<svg class="die blank" viewBox="0 0 40 40"><rect x="1" y="1" width="38" height="38" rx="8"/></svg>`;
   const D={1:[[2,2]],2:[[1,1],[3,3]],3:[[1,1],[2,2],[3,3]],4:[[1,1],[3,1],[1,3],[3,3]],5:[[1,1],[3,1],[2,2],[1,3],[3,3]],6:[[1,1],[3,1],[1,2],[3,2],[1,3],[3,3]]};
@@ -805,6 +918,7 @@ function statusText(){const p=P();
   if(!myTurn()){if(stalled())return `<b>${pn(p)}</b> (computer) seems stuck. <button class="ghost" data-act="takeover">Run it here</button>`;
     return `<b>${pn(p)}</b> is ${G.phase==='setup'?'choosing a spot':G.phase==='robber'?'moving the robber':'taking a turn'}…`}
   if(G.phase==='setup')return G.sub==='settlement'?`Place your ${G.setupIdx<4?'first':'second'} settlement on a glowing corner.${G.setupIdx>=4?' It pays out its neighboring tiles right away.':''}`:'Now place a road touching that settlement.';
+  if(L.pick)return `<b>${L.pick.prompt}</b>`;
   if(L.mode==='robber')return '<b>Move the robber:</b> tap any tile to block it.';
   if(L.mode==='freeRoad')return `Place a free road (<b>${G.freeRoads}</b> left).`;
   if(L.mode)return `Tap a glowing spot to build. Tap the button again to cancel.`;
@@ -850,7 +964,7 @@ function renderOffer(){const o=G.offer,el=$('#offerbar');
   el.innerHTML=`<span class="sw" style="background:${from.color}"></span><span class="txt">${txt}<br><small>Waiting on: ${waiting.join(', ')||'nobody'}</small></span>${btns}`}
 function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&&!L.flow,main=my&&G.phase==='main'&&L.mode!=='freeRoad'&&!G.offer;
   const s=G.dice?G.dice[0]+G.dice[1]:'';
-  const players=`<section><h2>Players · first to ${WIN}</h2><div class="players">${G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2;return `<div class="pl ${G.cur===p.i&&!won()?'cur':''}"><span class="score ${isLight(p.color)?'light':''} ${close?'close':''}" style="background:${p.color}" title="${pts} points">${pts}</span><b>${nm(p.i)}${isBot(p)?'<span class="botlbl">computer</span>':''}${G.longest===p.i?'<span class="badge">Road</span>':''}${G.army===p.i?'<span class="badge">Army</span>':''}</b><span class="togo ${close?'close':''}">${pts>=WIN?'won':(WIN-pts)+' to win'}</span>
+  const players=`<section><h2>Players · first to ${WIN}${G.rules==='house'?' · House Rules':''}</h2><div class="players">${G.players.map(p=>{const pts=vp(p,p.i===ME||won()),close=WIN-pts<=2;return `<div class="pl ${G.cur===p.i&&!won()?'cur':''}"><span class="score ${isLight(p.color)?'light':''} ${close?'close':''}" style="background:${p.color}" title="${pts} points">${pts}</span><b>${nm(p.i)}${isBot(p)?'<span class="botlbl">computer</span>':''}${G.longest===p.i?'<span class="badge">Road</span>':''}${G.army===p.i?'<span class="badge">Army</span>':''}</b><span class="togo ${close?'close':''}">${pts>=WIN?'won':(WIN-pts)+' to win'}</span>
     <span class="meta">${cards(p)} cards · ${p.dev.length} dev · ${p.knights} knights · road ${G.lens[p.i]}</span></div>`}).join('')}</div></section>`;
   const logH=`<section><h2>Log</h2><div class="log">${G.log.slice().reverse().map(l=>{const t=(l.secret&&l.secret[ME])||l.text;return l.p===null?`<div class="sys">${t}</div>`:`<div><span class="sw" style="background:${G.players[l.p].color}"></span><span><b>${nm(l.p)}</b> ${t}</span></div>`}).join('')}</div></section>`;
   const dice='';
@@ -859,8 +973,8 @@ function renderPanel(){const spect=ME<0,me=spect?null:G.players[ME],my=myTurn()&
   const spots={road:G.edges.some(e=>canRoad(e.id,ME)),settlement:G.verts.some(v=>canSettle(v.id,ME,false)),city:G.verts.some(v=>canCity(v.id,ME))};
   const bOK={road:main&&afford(me,COST.road)&&me.roads>0&&spots.road,settlement:main&&afford(me,COST.settlement)&&me.setts>0&&spots.settlement,city:main&&afford(me,COST.city)&&me.cities>0&&spots.city};
   const devGroups={};me.dev.forEach(d=>{devGroups[d.type]=devGroups[d.type]||{n:0,ready:0};devGroups[d.type].n++;if(d.turn<G.turn)devGroups[d.type].ready++});
-  const devHtml=Object.keys(devGroups).length?Object.entries(devGroups).map(([t,g])=>{const can=t!=='vp'&&canPlayDev(me,t)&&my&&!G.offer&&(t==='knight'?(G.phase==='roll'||G.phase==='main')&&!L.mode:G.phase==='main'&&!L.mode);
-    return `<div class="dev"><div><b>${DEV[t][0]}${g.n>1?' ×'+g.n:''}</b><small>${DEV[t][1]}${t!=='vp'&&g.ready<g.n?' New cards play next turn.':''}</small></div>${t==='vp'?'':`<button data-act="play-${t}" ${can?'':'disabled'}>Play</button>`}</div>`}).join(''):'<div class="empty">No development cards yet. They cost one Wool, Grain and Ore.</div>';
+  const devHtml=Object.keys(devGroups).length?Object.entries(devGroups).map(([t,g])=>{const can=t!=='vp'&&canPlayDev(me,t)&&my&&!G.offer&&((t==='knight'||t==='desert')?(G.phase==='roll'||G.phase==='main')&&!L.mode:G.phase==='main'&&!L.mode);
+    return `<div class="dev"><div><b>${DEV[t][0]}${g.n>1?' ×'+g.n:''}</b><small>${DEV[t][1]}${t!=='vp'&&t!=='desert'&&g.ready<g.n?' New cards play next turn.':''}${t==='desert'?` You have ${desertCount(ME)} of 3.`:''}</small></div>${t==='vp'?'':`<button data-act="play-${t}" ${can?'':'disabled'}>Play</button>`}</div>`}).join(''):'<div class="empty">No development cards yet. They cost one Wool, Grain and Ore.</div>';
   const u=L.ui,bk=rate(ME,u.bg);
   const opt=k=>RES.map(r=>`<option value="${r}" ${u[k]===r?'selected':''}>${RN[r]}</option>`).join('');
   $('#panel').innerHTML=dice+`
