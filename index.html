@@ -203,12 +203,12 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .togo{font-size:12px}
 .mapbtn.endturn{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 /* mini scoreboard in the water, top-left of the map */
-.mapscore{position:absolute;top:6px;left:6px;display:flex;flex-direction:column;gap:5px;pointer-events:none}
-.ms{width:26px;height:26px;border-radius:6px;border:2px solid rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;
-  font-family:var(--display);font-weight:800;font-size:15px;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4);box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.mapscore{position:absolute;top:5px;left:5px;display:flex;flex-direction:column;gap:3px;pointer-events:none}
+.ms{width:21px;height:21px;box-sizing:border-box;border-radius:5px;border:1.5px solid rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;
+  font-family:var(--display);font-weight:800;font-size:12.5px;font-variant-numeric:tabular-nums;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.4);box-shadow:0 2px 6px rgba(0,0,0,.35)}
 .ms.light{color:var(--ink);text-shadow:none}
 .ms.close{box-shadow:0 0 0 3px var(--accent),0 2px 6px rgba(0,0,0,.35)}
-.ms.cur{outline:3px solid var(--hot);outline-offset:1px}
+.ms.cur{outline:2px solid var(--hot);outline-offset:1px}
 .endwrap{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .endwrap .sure{color:#fff;font-weight:700;font-size:13.5px;text-shadow:0 1px 3px rgba(0,0,0,.8);padding-right:4px}
 /* road spots: bright yellow on a black outline so they stand out on any tile */
@@ -237,9 +237,9 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .modepick button{flex:1;min-height:44px}
 .modepick button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
 /* hand size next to each score square */
-.msrow{display:flex;align-items:center;gap:4px}
-.mc{display:flex;align-items:center;gap:3px;height:20px;padding:0 6px 0 4px;border-radius:999px;background:rgba(10,30,38,.72);color:#fff;font-weight:800;font-size:12.5px;font-variant-numeric:tabular-nums}
-.mc i{width:8px;height:11px;border-radius:2px;background:#f2efe6;border:1px solid rgba(0,0,0,.4);display:block}
+.msrow{display:flex;align-items:center;gap:3px}
+.mc{display:flex;align-items:center;gap:2px;height:16px;padding:0 5px 0 3px;border-radius:999px;background:rgba(10,30,38,.72);color:#fff;font-weight:800;font-size:10.5px;font-variant-numeric:tabular-nums}
+.mc i{width:6px;height:9px;border-radius:2px;background:#f2efe6;border:1px solid rgba(0,0,0,.4);display:block}
 .mc.over{background:#b3261e}
 /* most-rolled numbers, top-right of the map */
 .maphot:empty{display:none}
