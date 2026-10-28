@@ -254,6 +254,13 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
   font-size:11px;font-weight:700;letter-spacing:.04em;color:rgba(237,241,234,.55);font-variant-numeric:tabular-nums}
 /* ===== House Rules look: hand-drawn board only ===== */
 .hr-note{display:block;font-family:'Kalam','Comic Sans MS',cursive;font-weight:700;font-size:17px;line-height:1;color:#ffd23f;transform:rotate(-3deg);transform-origin:left center;margin-top:3px;margin-left:6px;letter-spacing:0}
+#cpuroll{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:16px;background:rgba(10,30,38,.82);box-shadow:0 10px 30px rgba(0,0,0,.45);pointer-events:none;z-index:4}
+#cpuroll[hidden]{display:none}
+#cpuroll .die{width:60px;height:60px}
+#cpuroll b{font-family:var(--display);font-weight:800;font-size:34px;color:#ffd23f;min-width:40px;text-align:center}
+#cpuroll.done{box-shadow:0 0 0 3px #ffd23f,0 10px 30px rgba(0,0,0,.45)}
+.rollpair{display:flex;gap:8px;pointer-events:none}
+.mapbtn.cpuroll{background:var(--panel)}
 .num.mk{font-family:'Kalam','Comic Sans MS',cursive;font-weight:700;font-size:19px}
 
 </style>
@@ -267,7 +274,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 <div id="toast" class="toast" hidden></div>
 <div id="turnflash" hidden></div>
 <div id="alertbox" role="status" hidden></div>
-<div id="version" aria-label="Version">v1.8</div>
+<div id="version" aria-label="Version">v1.9</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="crdice.js"></script>
@@ -300,7 +307,7 @@ const isLight=c=>c==='#f2efe6';
 const colorName=c=>(COLORS.find(x=>x.c===c)||{n:'Color'}).n;
 function freeColor(pref,taken){if(pref&&!taken.includes(pref))return pref;return COLORS.map(x=>x.c).find(c=>!taken.includes(c))}
 const BOTNAMES=['Marga','Tobin','Esk','Wren','Corin','Ilsa'];
-const VERSION='1.8';
+const VERSION='1.9';
 const S=60,SQ3=Math.sqrt(3),WIN=10,AI_PACE=1.3;
 const pips=n=>n?6-Math.abs(7-n):0;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -773,7 +780,7 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
     return}
   if(ME<0)return;
   if(a==='cancel'){G.offer=null;log(me,'withdrew a trade offer');render();await push();return}
-  if(a==='roll'){if(L.flow)return;const go=async v=>{if(!(G&&G.cur===ME&&G.phase==='roll'))return;L.flow=true;L.rolledAt=Date.now();render();try{await rollDice(v)}finally{L.flow=false}checkWin();render();await push()};if(window.CRDice){if(!CRDice.isOpen())CRDice.open(go)}else await go();return}
+  if(a==='roll'||a==='cpuroll'){if(L.flow||L.cpuRolling)return;const go=async v=>{if(!(G&&G.cur===ME&&G.phase==='roll'))return;L.flow=true;L.rolledAt=Date.now();render();try{await rollDice(v)}finally{L.flow=false}checkWin();render();await push()};if(a==='cpuroll'){cpuRoll(go);return}if(window.CRDice){if(!CRDice.isOpen())CRDice.open(go)}else await go();return}
   if(a==='end'){if(Date.now()-(L.rolledAt||0)<1000)return;
     if(Date.now()-(L.endArm||0)>=3000){L.endArm=Date.now();render();clearTimeout(L.endArmT);L.endArmT=setTimeout(()=>{L.endArm=0;render()},3000);return}
     L.endArm=0;clearTimeout(L.endArmT);L.mode=null;nextTurn();G.botRunner=ME;render();await push();afterChange();return}
@@ -933,6 +940,15 @@ function renderBoard(){const hv=hotVerts(),he=hotEdges(),ht=hotTiles();const MK=
   if(L.vertPreview!=null){const v=G.verts[L.vertPreview];s+=`<circle cx="${v.x}" cy="${v.y}" r="13" fill="var(--hot)" stroke="#1d2a2f" stroke-width="3"/>`}
   hv.forEach(id=>{const v=G.verts[id];s+=`<circle cx="${v.x}" cy="${v.y}" r="${(L.mode==='city'||L.pick)?14:8}" class="hot-v pulse" ${(L.mode==='city'||L.pick)?'fill-opacity=".35"':''}/><circle cx="${v.x}" cy="${v.y}" r="16" class="hit" data-v="${id}"><title>${L.pick?'Choose this':L.mode==='city'?'Upgrade to a city':'Build a settlement here'}</title></circle>`});
   $('#board').innerHTML=s}
+/* CPU roll: two dice flicker through faces in place, slowing down, then settle. */
+function cpuRoll(done){if(L.cpuRolling)return;L.cpuRolling=true;const box=document.querySelector('.svgbox');
+  let el=document.getElementById('cpuroll');if(!el){el=document.createElement('div');el.id='cpuroll';box.appendChild(el)}
+  const r=()=>1+(Math.random()*6|0),a=r(),b=r();let k=0,last=[0,0];const N=16;
+  const face=()=>{let x,y;do{x=r()}while(x===last[0]);do{y=r()}while(y===last[1]);last=[x,y];return last};
+  el.className='';el.hidden=false;
+  const tick=()=>{if(k<N){const [x,y]=face();el.innerHTML=die(x)+die(y);k++;setTimeout(tick,40+k*k*.6)}
+    else{el.innerHTML=die(a)+die(b)+`<b>${a+b}</b>`;el.className='done';setTimeout(()=>{el.hidden=true;L.cpuRolling=false;done([a,b])},800)}};
+  tick()}
 function die(n){if(!n)return `<svg class="die blank" viewBox="0 0 40 40"><rect x="1" y="1" width="38" height="38" rx="8"/></svg>`;
   const D={1:[[2,2]],2:[[1,1],[3,3]],3:[[1,1],[2,2],[3,3]],4:[[1,1],[3,1],[1,3],[3,3]],5:[[1,1],[3,1],[2,2],[1,3],[3,3]],6:[[1,1],[3,1],[1,2],[3,2],[1,3],[3,3]]};
   return `<svg class="die" viewBox="0 0 40 40" aria-label="${n}"><rect x="1" y="1" width="38" height="38" rx="8"/>${D[n].map(([x,y])=>`<circle cx="${x*10}" cy="${y*10}" r="3.8"/>`).join('')}</svg>`}
@@ -958,7 +974,7 @@ function renderMapCtl(spect,my,main){const el=$('#mapctl');
   if(ME<0||G.cur!==ME||G.phase==='setup'){el.innerHTML='';return}
   const rolling=G.phase==='roll'||G.phase==='discard'||G.phase==='robber'||!G.dice;
   if(rolling){const canRoll=my&&G.phase==='roll'&&!L.mode;
-    el.innerHTML=`<span></span><button class="mapbtn roll primary${canRoll?' ready':''}" data-act="roll" ${canRoll?'':'disabled'}>Roll</button>`;return}
+    el.innerHTML=`<span></span><div class="rollpair"><button class="mapbtn cpuroll" data-act="cpuroll" ${canRoll?'':'disabled'}>CPU roll</button><button class="mapbtn roll primary${canRoll?' ready':''}" data-act="roll" ${canRoll?'':'disabled'}>Self roll</button></div>`;return}
   const locked=Date.now()-(L.rolledAt||0)<1000;
   if(locked){clearTimeout(L.unlockT);L.unlockT=setTimeout(()=>render(),1000-(Date.now()-L.rolledAt)+30)}
   const canEnd=main&&!L.mode&&!locked;
