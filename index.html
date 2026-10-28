@@ -267,9 +267,10 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 <div id="toast" class="toast" hidden></div>
 <div id="turnflash" hidden></div>
 <div id="alertbox" role="status" hidden></div>
-<div id="version" aria-label="Version">v1.7</div>
+<div id="version" aria-label="Version">v1.8</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+<script src="crdice.js"></script>
 <script>
 /* ===== Your Supabase project (Project Settings → API) ===== */
 const CONFIG={
@@ -299,7 +300,7 @@ const isLight=c=>c==='#f2efe6';
 const colorName=c=>(COLORS.find(x=>x.c===c)||{n:'Color'}).n;
 function freeColor(pref,taken){if(pref&&!taken.includes(pref))return pref;return COLORS.map(x=>x.c).find(c=>!taken.includes(c))}
 const BOTNAMES=['Marga','Tobin','Esk','Wren','Corin','Ilsa'];
-const VERSION='1.7';
+const VERSION='1.8';
 const S=60,SQ3=Math.sqrt(3),WIN=10,AI_PACE=1.3;
 const pips=n=>n?6-Math.abs(7-n):0;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -411,7 +412,7 @@ function buildSettlement(p,vid){pay(p,COST.settlement);G.verts[vid].b={p:p.i,cit
 function buildCity(p,vid){pay(p,COST.city);G.verts[vid].b.city=true;p.cities--;p.setts++;log(p,'upgraded to a city')}
 function buyDev(p){pay(p,COST.dev);const c=G.deck.pop();p.dev.push({type:c,turn:G.turn});log(p,'bought a development card',{[p.i]:`bought a development card: ${DEV[c][0]}`})}
 
-async function rollDice(){const a=1+(Math.random()*6|0),b=1+(Math.random()*6|0);G.dice=[a,b];(G.rollCounts=G.rollCounts||{})[a+b]=(G.rollCounts[a+b]||0)+1;(G.rolls=G.rolls||[]).push({p:G.cur,a,b});if(G.rolls.length>12)G.rolls.splice(0,G.rolls.length-12);log(P(),`rolled ${a+b}`);
+async function rollDice(fx){const a=fx?fx[0]:1+(Math.random()*6|0),b=fx?fx[1]:1+(Math.random()*6|0);G.dice=[a,b];(G.rollCounts=G.rollCounts||{})[a+b]=(G.rollCounts[a+b]||0)+1;(G.rolls=G.rolls||[]).push({p:G.cur,a,b});if(G.rolls.length>12)G.rolls.splice(0,G.rolls.length-12);log(P(),`rolled ${a+b}`);
   if(a+b===7){const need={};
     for(const p of G.players){const n=cards(p);if(n>7){const k=Math.floor(n/2);if(isBot(p)){aiDiscard(p,k);log(p,`discarded ${k} cards`)}else need[p.i]=k}}
     if(Object.keys(need).length){G.discards=need;G.phase='discard';await push();render();
@@ -772,7 +773,7 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
     return}
   if(ME<0)return;
   if(a==='cancel'){G.offer=null;log(me,'withdrew a trade offer');render();await push();return}
-  if(a==='roll'){L.flow=true;L.rolledAt=Date.now();render();try{await rollDice()}finally{L.flow=false}checkWin();render();await push();return}
+  if(a==='roll'){if(L.flow)return;const go=async v=>{if(!(G&&G.cur===ME&&G.phase==='roll'))return;L.flow=true;L.rolledAt=Date.now();render();try{await rollDice(v)}finally{L.flow=false}checkWin();render();await push()};if(window.CRDice){if(!CRDice.isOpen())CRDice.open(go)}else await go();return}
   if(a==='end'){if(Date.now()-(L.rolledAt||0)<1000)return;
     if(Date.now()-(L.endArm||0)>=3000){L.endArm=Date.now();render();clearTimeout(L.endArmT);L.endArmT=setTimeout(()=>{L.endArm=0;render()},3000);return}
     L.endArm=0;clearTimeout(L.endArmT);L.mode=null;nextTurn();G.botRunner=ME;render();await push();afterChange();return}
