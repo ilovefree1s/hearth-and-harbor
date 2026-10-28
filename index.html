@@ -264,6 +264,20 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 .rollpair{display:flex;gap:6px}
 .rollpair button{min-height:36px;padding:6px 12px;font-size:14.5px;border-radius:9px}
 .rollpair .ready{animation:glow 1.4s ease-in-out infinite}
+.awards{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:4px 0 10px}
+.aw{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 8px;line-height:1.25}
+.aw small{display:block;font-size:10.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.aw div{font-size:15px}.aw em{font-style:normal;font-size:12px;color:var(--muted)}
+.aw:first-child{grid-column:1/-1;background:#fff4d6;border-color:#e8c45a}
+.stwrap{max-height:46vh;overflow:auto;margin:0 -4px}
+table.stats{width:100%;border-collapse:collapse;font-size:13px}
+table.stats th{position:sticky;top:0;background:var(--panel);padding:2px 2px 6px}
+table.stats td{padding:4px 3px;border-top:1px solid var(--line);text-align:center;vertical-align:middle;font-variant-numeric:tabular-nums}
+table.stats td:first-child{text-align:left;color:var(--ink)}
+table.stats td.stmax{font-weight:800;color:#b3261e}
+table.stats tr.sth td{border-top:none;padding-top:10px;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left}
+.stc{display:inline-block;min-width:38px;padding:2px 4px;border-radius:5px;color:#fff;font-size:11px;font-weight:800;text-shadow:0 1px 0 rgba(0,0,0,.35)}
+.stc.light{color:var(--ink);text-shadow:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
 .num.mk{font-family:'Kalam','Comic Sans MS',cursive;font-weight:700;font-size:19px}
 
 </style>
@@ -277,7 +291,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 <div id="toast" class="toast" hidden></div>
 <div id="turnflash" hidden></div>
 <div id="alertbox" role="status" hidden></div>
-<div id="version" aria-label="Version">v1.13</div>
+<div id="version" aria-label="Version">v1.14</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="crdice.js"></script>
@@ -310,7 +324,7 @@ const isLight=c=>c==='#f2efe6';
 const colorName=c=>(COLORS.find(x=>x.c===c)||{n:'Color'}).n;
 function freeColor(pref,taken){if(pref&&!taken.includes(pref))return pref;return COLORS.map(x=>x.c).find(c=>!taken.includes(c))}
 const BOTNAMES=['Marga','Tobin','Esk','Wren','Corin','Ilsa'];
-const VERSION='1.13';
+const VERSION='1.14';
 const S=60,SQ3=Math.sqrt(3),WIN=10,AI_PACE=1.3;
 const pips=n=>n?6-Math.abs(7-n):0;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -406,9 +420,40 @@ function updateLongest(){const Ls=G.players.map(p=>longestFor(p.i));G.lens=Ls;co
 function updateArmy(p){if(p.knights>=3&&G.army!==p.i&&(G.army===null||p.knights>G.players[G.army].knights)){G.army=p.i;log(p,`took the Largest Army (${p.knights} knights)`)}}
 function checkWin(){const p=P();if(!won()&&vp(p,true)>=WIN){G.winner=p.i;L.mode=null;log(p,`reached ${vp(p,true)} points and won!`)}}
 function produce(sum){const gains=G.players.map(()=>({}));
-  G.tiles.forEach((t,ti)=>{if(t.num!==sum)return;if(ti===G.robber){log(null,`The robber blocks the ${TILE[t.type].name} (${sum}).`);return}
-    t.v.forEach(vid=>{const b=G.verts[vid].b;if(b){const n=b.city?2:1;G.players[b.p].res[t.type]+=n;gains[b.p][t.type]=(gains[b.p][t.type]||0)+n}})});
+  G.tiles.forEach((t,ti)=>{if(t.num!==sum)return;if(ti===G.robber){t.v.forEach(vid=>{const b=G.verts[vid].b;if(b)st(b.p,'blocked',b.city?2:1)});log(null,`The robber blocks the ${TILE[t.type].name} (${sum}).`);return}
+    t.v.forEach(vid=>{const b=G.verts[vid].b;if(b){const n=b.city?2:1;G.players[b.p].res[t.type]+=n;st(b.p,'earned',n);gains[b.p][t.type]=(gains[b.p][t.type]||0)+n}})});
   let any=false;gains.forEach((g,i)=>{const s=fmt(g);if(s){any=true;log(G.players[i],'collected '+s)}});if(!any)log(null,'Nothing produced.')}
+/* ---------- end-of-game stats ---------- */
+function st(i,k,n){if(i==null||i<0||!G)return;n=n==null?1:n;if(!n)return;const S=G.stats=G.stats||{},o=S[i]=S[i]||{};o[k]=(o[k]||0)+n}
+const STAT_ROWS=[
+  ['The robber',null],
+  ['robberOn','Robber parked on you'],['robbed','Cards the robber stole from you'],['blocked','Cards the robber blocked'],['stole','Cards you stole'],
+  ['Losses',null],
+  ['discarded','Cards thrown away on 7s'],['monoLost','Cards lost to Monopoly'],
+  ['House Rules hits',null,'house'],
+  ['bombed','Buildings bombed','house'],['burned','Roads burned','house'],['swapped','Settlements swapped away','house'],['hwLost','Cards lost to Highway Robbery','house'],['resetLost','Cards lost to The Great Reset','house'],
+  ['Your game',null],
+  ['earned','Cards collected from rolls'],['sevens','7s you rolled'],['avg','Average roll'],['trades','Trades made'],['devBought','Dev cards bought'],['knights','Knights played']];
+function screwed(o){o=o||{};return (o.robbed||0)+(o.blocked||0)+(o.discarded||0)+(o.monoLost||0)+(o.hwLost||0)+(o.resetLost||0)+(o.robberOn||0)+3*(o.bombed||0)+2*(o.burned||0)+2*(o.swapped||0)}
+function showStats(){const S=(G&&G.stats)||{},ps=G.players,get=(p,k)=>{const o=S[p.i]||{};if(k==='avg')return o.rolls?(o.rollSum/o.rolls).toFixed(1):'–';return o[k]||0};
+  const house=G.rules==='house';
+  const best=(f,min)=>{let top=-1,who=[];ps.forEach(p=>{const v=f(S[p.i]||{});if(v>top){top=v;who=[p]}else if(v===top)who.push(p)});return top>(min||0)?{who,top}:null};
+  const names=w=>w.who.map(p=>`<b style="color:${isLight(p.color)?'var(--ink)':p.color}">${esc(nm(p.i))}</b>`).join(' & ');
+  const aw=[];
+  const sc=best(screwed);if(sc)aw.push(['Got screwed the most',names(sc),`${sc.top} pain points`]);
+  const rb=best(o=>(o.robberOn||0)+(o.robbed||0));if(rb)aw.push(['The robber’s favorite',names(rb),`${rb.top} visits and steals`]);
+  const th=best(o=>o.stole||0);if(th)aw.push(['Sticky fingers',names(th),`${th.top} cards stolen`]);
+  const lk=best(o=>o.earned||0);if(lk)aw.push(['Dice loved them',names(lk),`${lk.top} cards from rolls`]);
+  const sv=best(o=>o.sevens||0);if(sv)aw.push(['Rolled the most 7s',names(sv),`${sv.top} sevens`]);
+  const head=ps.map(p=>`<th><span class="stc${isLight(p.color)?' light':''}" style="background:${p.color}">${esc(nm(p.i).slice(0,6))}</span></th>`).join('');
+  const rows=STAT_ROWS.filter(r=>!r[2]||house).map(r=>{if(!r[1])return `<tr class="sth"><td colspan="${ps.length+1}">${r[0]}</td></tr>`;
+    const vals=ps.map(p=>get(p,r[0])),nums=vals.map(v=>+v||0),mx=Math.max(...nums);
+    return `<tr><td>${r[1]}</td>${vals.map((v,i)=>`<td class="${mx>0&&nums[i]===mx&&r[0]!=='avg'?'stmax':''}">${v}</td>`).join('')}</tr>`}).join('');
+  modal(`<h3>Game stats</h3>${aw.length?`<div class="awards">${aw.map(a=>`<div class="aw"><small>${a[0]}</small><div>${a[1]}</div><em>${a[2]}</em></div>`).join('')}</div>`:''}
+    <div class="stwrap"><table class="stats"><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+    ${G.stats?'':'<p>Stats only count from v1.14 on, so this game has nothing recorded.</p>'}
+    <div class="opts">${won()?'<button data-c="back">Back</button>':''}<button class="primary" data-c="close">Close</button></div>`,
+    b=>{if(b.dataset.c==='back'){closeModal();showWin()}else closeModal()})}
 function log(p,text,secret,alert){G.logN=(G.logN||0)+1;G.log.push({n:G.logN,p:p?p.i:null,text,secret:secret||null,alert:alert||null});if(G.log.length>70)G.log.splice(0,G.log.length-70)}
 
 /* ---------- actions (run only on the acting player's device) ---------- */
@@ -420,11 +465,11 @@ function placeSetupRoad(pi,eid){G.edges[eid].road=pi;G.players[pi].roads--;G.sub
 function buildRoad(p,eid,free){if(!free)pay(p,COST.road);G.edges[eid].road=p.i;p.roads--;log(p,free?'built a free road':'built a road');updateLongest()}
 function buildSettlement(p,vid){pay(p,COST.settlement);G.verts[vid].b={p:p.i,city:false};p.setts--;log(p,'built a settlement');updateLongest()}
 function buildCity(p,vid){pay(p,COST.city);G.verts[vid].b.city=true;p.cities--;p.setts++;log(p,'upgraded to a city')}
-function buyDev(p){pay(p,COST.dev);const c=G.deck.pop();p.dev.push({type:c,turn:G.turn});log(p,'bought a development card',{[p.i]:`bought a development card: ${DEV[c][0]}`})}
+function buyDev(p){pay(p,COST.dev);const c=G.deck.pop();p.dev.push({type:c,turn:G.turn});st(p.i,'devBought');log(p,'bought a development card',{[p.i]:`bought a development card: ${DEV[c][0]}`})}
 
-async function rollDice(fx){const a=fx?fx[0]:1+(Math.random()*6|0),b=fx?fx[1]:1+(Math.random()*6|0);G.dice=[a,b];(G.rollCounts=G.rollCounts||{})[a+b]=(G.rollCounts[a+b]||0)+1;(G.rolls=G.rolls||[]).push({p:G.cur,a,b});if(G.rolls.length>12)G.rolls.splice(0,G.rolls.length-12);log(P(),`rolled ${a+b}`);
+async function rollDice(fx){const a=fx?fx[0]:1+(Math.random()*6|0),b=fx?fx[1]:1+(Math.random()*6|0);G.dice=[a,b];(G.rollCounts=G.rollCounts||{})[a+b]=(G.rollCounts[a+b]||0)+1;(G.rolls=G.rolls||[]).push({p:G.cur,a,b});if(G.rolls.length>12)G.rolls.splice(0,G.rolls.length-12);log(P(),`rolled ${a+b}`);st(G.cur,'rolls');st(G.cur,'rollSum',a+b);if(a+b===7)st(G.cur,'sevens');
   if(a+b===7){const need={};
-    for(const p of G.players){const n=cards(p);if(n>7){const k=Math.floor(n/2);if(isBot(p)){aiDiscard(p,k);log(p,`discarded ${k} cards`)}else need[p.i]=k}}
+    for(const p of G.players){const n=cards(p);if(n>7){const k=Math.floor(n/2);if(isBot(p)){aiDiscard(p,k);st(p.i,'discarded',k);log(p,`discarded ${k} cards`)}else need[p.i]=k}}
     if(Object.keys(need).length){G.discards=need;G.phase='discard';await push();render();
       await waitUntil(()=>!G.discards||!Object.keys(G.discards).length);G.discards=null}
     await moveRobber();
@@ -440,17 +485,17 @@ async function moveRobber(){const p=P();let ti;G.phase='robber';await push();
       L.robberPreview=null;if(ok)break;render()}
     L.mode=null}
   else{ti=aiRobberHex(p.i);await sleep(450)}
-  G.robber=ti;const t=G.tiles[ti];log(p,`moved the robber to the ${TILE[t.type].name}${t.num?' ('+t.num+')':''}`);
+  G.robber=ti;const t=G.tiles[ti];[...new Set(t.v.map(v=>G.verts[v].b).filter(b=>b&&b.p!==p.i).map(b=>b.p))].forEach(i=>st(i,'robberOn'));log(p,`moved the robber to the ${TILE[t.type].name}${t.num?' ('+t.num+')':''}`);
   const vics=[...new Set(t.v.map(v=>G.verts[v].b).filter(b=>b&&b.p!==p.i).map(b=>b.p))].filter(i=>cards(G.players[i])>0);
   if(vics.length){let vi;
     if(!isBot(p))vi=vics.length>1?await chooseModal('Steal a card','Choose whose hand to draw from.',vics.map(i=>({label:`${esc(G.players[i].name)} · ${cards(G.players[i])} cards`,value:i,color:G.players[i].color}))):vics[0];
     else vi=maxBy(vics,i=>vp(G.players[i])+Math.random()*.5);
     const v=G.players[vi],pool=[];RES.forEach(r=>{for(let k=0;k<v.res[r];k++)pool.push(r)});
-    if(pool.length){const r=pool[Math.random()*pool.length|0];v.res[r]--;p.res[r]++;
+    if(pool.length){const r=pool[Math.random()*pool.length|0];v.res[r]--;p.res[r]++;st(v.i,'robbed');st(p.i,'stole');
       log(p,`stole a card from ${pn(v)}`,{[p.i]:`stole 1 ${RN[r]} from ${pn(v)}`,[v.i]:`stole 1 ${RN[r]} from you`},{[v.i]:`${pn(p)} moved the robber and stole 1 ${RN[r]} from you.`})}}
   await push();render()}
 async function playDev(p,type,arg){if(isHouse(type)){await playHouse(p,type,arg);return}const idx=p.dev.findIndex(d=>d.type===type&&d.turn<G.turn);p.dev.splice(idx,1);G.devPlayed=true;log(p,`played ${DEV[type][0]}`);
-  if(type==='knight'){p.knights++;updateArmy(p);const prev=G.phase;await moveRobber();G.phase=prev}
+  if(type==='knight'){p.knights++;st(p.i,'knights');updateArmy(p);const prev=G.phase;await moveRobber();G.phase=prev}
   if(type==='road'){
     if(!isBot(p)){G.freeRoads=Math.min(2,p.roads);L.mode='freeRoad';if(!hotEdges().size){L.mode=null;G.freeRoads=0}}
     else for(let k=0;k<2&&p.roads>0;k++){let e=roadTarget(p);if(e==null)e=G.edges.find(x=>canRoad(x.id,p.i))?.id;if(e==null)break;buildRoad(p,e,true)}}
@@ -458,7 +503,7 @@ async function playDev(p,type,arg){if(isHouse(type)){await playHouse(p,type,arg)
     if(!isBot(p)){const opts=RES.map(r=>({label:RN[r],value:r,color:TILE[r].fill}));picks=[await chooseModal('Year of Plenty','Pick your first resource.',opts),await chooseModal('Year of Plenty','Pick your second resource.',opts)]}
     picks.forEach(r=>p.res[r]++);log(p,'took '+picks.map(r=>RN[r]).join(' and '))}
   if(type==='monopoly'){const r=!isBot(p)?await chooseModal('Monopoly','Every opponent hands over all cards of this resource.',RES.map(r=>({label:RN[r],value:r,color:TILE[r].fill}))):arg;
-    let n=0;const lost={};G.players.forEach(o=>{if(o!==p){const k=o.res[r];n+=k;o.res[r]=0;lost[o.i]=k}});p.res[r]+=n;
+    let n=0;const lost={};G.players.forEach(o=>{if(o!==p){const k=o.res[r];n+=k;o.res[r]=0;lost[o.i]=k;st(o.i,'monoLost',k)}});p.res[r]+=n;
     const al={};Object.entries(lost).forEach(([i,k])=>al[i]=`${pn(p)} played Monopoly and took ${k?'all '+k+' of your '+RN[r]:'everyone’s '+RN[r]+' (you had none)'}.`);
     log(p,`used Monopoly to take every ${RN[r]} card (${n} in total)`,null,al)}
   checkWin();await push();render()}
@@ -484,7 +529,7 @@ async function playHouse(p,type,arg){
   if(type==='desert'){if(desertCount(p.i)>=3){G.winner=p.i;L.mode=null;log(p,`ruled the Dunes with Desert Dominion and won the game!`)}}
   if(type==='bomb'){const targets=oppBuildings(p.i).map(v=>v.id);let vid=arg;
     if(human)vid=await pickConfirm('vert',targets,'The Bomb: tap an opponent’s settlement or city.','Drop The Bomb here?',id=>{const v=G.verts[id];return `${ownerChip(v.b.p)}’s ${bName(v)} ${v.b.city?'gets knocked down to a settlement.':'is destroyed.'}`},'Drop it');
-    if(vid!=null){const v=G.verts[vid],o=G.players[v.b.p];
+    if(vid!=null){const v=G.verts[vid],o=G.players[v.b.p];st(o.i,'bombed');
       if(v.b.city&&o.setts>0){v.b.city=false;o.cities++;o.setts--;log(p,`bombed ${pn(o)}’s city down to a settlement`,null,{[o.i]:`${pn(p)} dropped The Bomb on your city. It’s a settlement now.`})}
       else if(v.b.city){v.b=null;o.cities++;log(p,`bombed ${pn(o)}’s city off the map (they had no settlement left to put back)`,null,{[o.i]:`${pn(p)} dropped The Bomb on your city. With no spare settlement piece, it was destroyed.`})}
       else{v.b=null;o.setts++;log(p,`bombed ${pn(o)}’s settlement off the map`,null,{[o.i]:`${pn(p)} dropped The Bomb and destroyed one of your settlements.`})}
@@ -492,25 +537,25 @@ async function playHouse(p,type,arg){
   if(type==='burn'){let picks=arg||[];
     if(human){picks=[];for(let k=0;k<2;k++){const rs=G.edges.filter(e=>e.road!=null&&!picks.includes(e.id)).map(e=>e.id);if(!rs.length)break;
       const id=await pickConfirm('edge',rs,`Burn It Down: tap road ${k+1} of 2 to destroy.`,'Burn this road?',id=>`${ownerChip(G.edges[id].road)}’s road goes up in flames.`,'Burn it');if(id==null)break;picks.push(id)}}
-    const al={};picks.forEach(id=>{const o=G.edges[id].road;if(o==null)return;removeRoad(id);if(o!==p.i)al[o]=(al[o]?al[o]+' ':'')+`${pn(p)} burned down one of your roads.`});
+    const al={};picks.forEach(id=>{const o=G.edges[id].road;if(o==null)return;removeRoad(id);if(o!==p.i)st(o,'burned');if(o!==p.i)al[o]=(al[o]?al[o]+' ':'')+`${pn(p)} burned down one of your roads.`});
     log(p,`burned down ${picks.length} road${picks.length===1?'':'s'}`,null,al);updateLongest()}
   if(type==='swap'){let mine=arg&&arg[0],theirs=arg&&arg[1];
     if(human){mine=await pickConfirm('vert',owned(p.i,false).map(v=>v.id),'Settlement Swap: tap one of YOUR settlements.','Swap this settlement away?',id=>`Your settlement on ${G.verts[id].hexes.map(tileName).join(', ')}`,'Use this one');
       if(mine!=null)theirs=await pickConfirm('vert',G.verts.filter(v=>v.b&&!v.b.city&&v.b.p!==p.i).map(v=>v.id),'Settlement Swap: now tap another player’s settlement.','Swap with this settlement?',id=>`You take ${ownerChip(G.verts[id].b.p)}’s settlement on ${G.verts[id].hexes.map(tileName).join(', ')}, and they get yours.`,'Swap')}
-    if(mine!=null&&theirs!=null){const a=G.verts[mine],b=G.verts[theirs],o=G.players[b.b.p];a.b.p=o.i;b.b.p=p.i;
+    if(mine!=null&&theirs!=null){const a=G.verts[mine],b=G.verts[theirs],o=G.players[b.b.p];st(o.i,'swapped');a.b.p=o.i;b.b.p=p.i;
       log(p,`swapped settlements with ${pn(o)}`,null,{[o.i]:`${pn(p)} used Settlement Swap. One of your settlements traded places with theirs.`});updateLongest()}}
   if(type==='highway'){let mode=arg&&arg.mode,picks=arg&&arg.picks;
     if(human){mode=await chooseModal('Highway Robbery','Choose one:',[{label:'Take 4 from the bank',value:'bank'},{label:'Steal 2 from everyone',value:'steal'}]);
       if(mode==='bank'){picks=[];const opts=RES.map(r=>({label:RN[r],value:r,color:TILE[r].fill}));for(let k=0;k<4;k++)picks.push(await chooseModal('Highway Robbery',`Pick resource ${k+1} of 4.${picks.length?' So far: '+picks.map(r=>RN[r]).join(', '):''}`,opts))}}
     if(mode==='bank'){picks.forEach(r=>p.res[r]++);log(p,`took ${picks.map(r=>RN[r]).join(', ')} from the bank`)}
     else{G.players.forEach(o=>{if(o===p)return;const got=[];for(let k=0;k<2;k++){const pool=[];RES.forEach(r=>{for(let j=0;j<o.res[r];j++)pool.push(r)});if(!pool.length)break;const r=pool[Math.random()*pool.length|0];o.res[r]--;p.res[r]++;got.push(r)}
-      if(got.length)A[o.i]=`${pn(p)} pulled a Highway Robbery and stole ${got.map(r=>'1 '+RN[r]).join(' and ')} from you.`});
+      st(o.i,'hwLost',got.length);if(got.length)A[o.i]=`${pn(p)} pulled a Highway Robbery and stole ${got.map(r=>'1 '+RN[r]).join(' and ')} from you.`});
       log(p,'robbed every player of 2 cards',null,A)}}
   if(type==='numswap'){let a=arg&&arg[0],b=arg&&arg[1];const nums=G.tiles.map((t,i)=>t.num?i:-1).filter(i=>i>=0);
     if(human){a=await pickConfirm('tile',nums,'Number Swap: tap the first numbered tile.','Swap this number?',id=>tileName(id),'Use this tile');
       if(a!=null)b=await pickConfirm('tile',nums.filter(i=>i!==a),`Number Swap: tap the tile to trade with ${tileName(a)}.`,'Swap these numbers?',id=>`${tileName(a)} ⇄ ${tileName(id)}`,'Swap')}
     if(a!=null&&b!=null){const x=G.tiles[a].num;G.tiles[a].num=G.tiles[b].num;G.tiles[b].num=x;log(p,`swapped the numbers on the ${tileName(b)} and ${tileName(a)}`)}}
-  if(type==='reset'){G.players.forEach(o=>{const n=cards(o);RES.forEach(r=>o.res[r]=0);if(o!==p&&n)A[o.i]=`${pn(p)} played The Great Reset. You threw away all ${n} of your cards.`});
+  if(type==='reset'){G.players.forEach(o=>{const n=cards(o);RES.forEach(r=>o.res[r]=0);if(o!==p)st(o.i,'resetLost',n);if(o!==p&&n)A[o.i]=`${pn(p)} played The Great Reset. You threw away all ${n} of your cards.`});
     log(p,'wiped out every hand with The Great Reset',null,A)}
   if(type==='gambler'){const d1=1+(Math.random()*6|0),d2=1+(Math.random()*6|0),s=d1+d2,win=s>=8;
     if(human)await chooseModal(`The Gambler rolled ${s}`,`${d1} + ${d2}. ${win?'Build a city for free!':'You lose one of your own roads.'}`,[{label:'OK',value:1}]);
@@ -679,13 +724,13 @@ function resume(){if(!G||!G.players||L.flow||L.busy||won()||G.phase==='lobby')re
 async function promptDiscard(){L.discarding=true;
   try{const k=G.discards[ME];const sel=await discardModal(k);
     await mutate(()=>{if(!G.discards||!G.discards[ME])return false;const me=G.players[ME];if(RES.some(r=>me.res[r]<sel[r]))return false;
-      RES.forEach(r=>me.res[r]-=sel[r]);delete G.discards[ME];log(me,`discarded ${k} cards`)})}
+      RES.forEach(r=>me.res[r]-=sel[r]);st(ME,'discarded',k);delete G.discards[ME];log(me,`discarded ${k} cards`)})}
   finally{L.discarding=false}}
 function resolveOffer(){const o=G&&G.offer;if(!o||o.from!==ME||o.resolving)return;
   if(o.to.every(i=>o.declined.includes(i))){o.resolving=true;
     mutate(()=>{if(!G.offer||G.offer.id!==o.id)return false;const off=G.offer,me=G.players[ME];
       const bot=G.players.find(p=>isBot(p)&&aiAccepts(p,off.give,off.get,ME));
-      if(bot&&RES.every(r=>me.res[r]>=off.give[r])){RES.forEach(r=>{me.res[r]+=off.get[r]-off.give[r];bot.res[r]+=off.give[r]-off.get[r]});log(bot,`accepted ${pn(me)}'s trade: ${fmt(off.give)} for ${fmt(off.get)}`)}
+      if(bot&&RES.every(r=>me.res[r]>=off.give[r])){RES.forEach(r=>{me.res[r]+=off.get[r]-off.give[r];bot.res[r]+=off.give[r]-off.get[r]});st(me.i,'trades');st(bot.i,'trades');log(bot,`accepted ${pn(me)}'s trade: ${fmt(off.give)} for ${fmt(off.get)}`)}
       else log(null,`No one accepted ${pn(me)}'s offer of ${fmt(off.give)} for ${fmt(off.get)}.`);
       G.offer=null})}}
 
@@ -774,11 +819,12 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
   if(a==='fs'){toggleFullscreen();return}
   if(a==='quit'){if(quitArm&&Date.now()-quitArm<3000){quitArm=0;clearTimeout(quitTimer);await quitGame()}
     else{quitArm=Date.now();b.textContent='Tap again to quit';clearTimeout(quitTimer);quitTimer=setTimeout(()=>{quitArm=0;render()},3000)}return}
+  if(a==='stats'){showStats();return}
   if(a==='takeover'){await mutate(()=>{G.botRunner=ME});return}
   if(a==='accept'||a==='decline'){const id=b.dataset.id;
     if(a==='accept')await mutate(()=>{const o=G.offer;if(!o||o.id!==id)return false;const from=G.players[o.from],to=G.players[ME];
       if(RES.some(r=>from.res[r]<o.give[r]||to.res[r]<o.get[r])){toast('Someone no longer has those cards.');return false}
-      RES.forEach(r=>{from.res[r]+=o.get[r]-o.give[r];to.res[r]+=o.give[r]-o.get[r]});log(to,`accepted ${pn(from)}'s trade: ${fmt(o.give)} for ${fmt(o.get)}`);G.offer=null});
+      RES.forEach(r=>{from.res[r]+=o.get[r]-o.give[r];to.res[r]+=o.give[r]-o.get[r]});st(from.i,'trades');st(to.i,'trades');log(to,`accepted ${pn(from)}'s trade: ${fmt(o.give)} for ${fmt(o.get)}`);G.offer=null});
     else await mutate(()=>{const o=G.offer;if(!o||o.id!==id)return false;if(!o.declined.includes(ME))o.declined.push(ME)});
     return}
   if(ME<0)return;
@@ -897,8 +943,8 @@ function discardModal(k){return new Promise(res=>{const sel=z();
       b=>{const d=b.dataset.d;if(!d)return;if(d==='ok'){closeModal();res({...sel});return}const r=d.slice(1);sel[r]+=d[0]==='+'?1:-1;draw()})};
   draw()})}
 function showWin(){L.winShown=true;store.set('hh-last','');const w=G.players[G.winner],host=G.host===UID,rows=G.players.map(p=>`<div class="pl"><span class="sw" style="background:${p.color}"></span><b>${nm(p.i)}</b><span class="vp">${vp(p,true)}</span></div>`).join('');
-  modal(`<h3>${w.i===ME?'You win the island':pn(w)+' wins the island'}</h3><p>${w.i===ME?'Ten points, fairly earned.':'Better luck on the next map.'}</p><div class="players">${rows}</div><div class="opts">${host?'<button class="primary" data-c="again">Play again</button>':''}<button data-c="close">Look at the board</button><button data-c="home">Back to start</button></div>${host?'':'<p>The host can start a rematch with the same players.</p>'}`,
-    b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name,color:p.color}));sync(G,{phase:'lobby',host:G.host,seats,rules:G.rules,v:G.v})})}else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
+  modal(`<h3>${w.i===ME?'You win the island':pn(w)+' wins the island'}</h3><p>${w.i===ME?'Ten points, fairly earned.':'Better luck on the next map.'}</p><div class="players">${rows}</div><div class="opts">${host?'<button class="primary" data-c="again">Play again</button>':''}<button data-c="stats">Stats</button><button data-c="close">Look at the board</button><button data-c="home">Back to start</button></div>${host?'':'<p>The host can start a rematch with the same players.</p>'}`,
+    b=>{if(b.dataset.c==='again'){closeModal();mutate(()=>{if(!won())return false;const seats=G.players.filter(p=>!isBot(p)).map(p=>({uid:p.uid,name:p.name,color:p.color}));sync(G,{phase:'lobby',host:G.host,seats,rules:G.rules,v:G.v})})}else if(b.dataset.c==='stats')showStats();else if(b.dataset.c==='close')closeModal();else if(b.dataset.c==='home')goHome()})}
 function checkAlerts(){if(!G||!G.log||ME<0)return;const top=G.logN||0;
   if(L.seenLog==null||L.seenCode!==CODE){L.seenLog=top;L.seenCode=CODE;return}
   if(top>L.seenLog){const msgs=G.log.filter(l=>l.n>L.seenLog&&l.alert&&l.alert[ME]).map(l=>l.alert[ME]);L.seenLog=top;if(msgs.length)alertBox(msgs)}}
@@ -971,7 +1017,7 @@ function statusText(){const p=P();
   if(G.offer&&G.offer.from===ME)return 'Waiting for answers to your trade offer…';
   if(G.phase==='roll')return '<b>Your turn.</b> Roll the dice.';
   return 'Build, trade or play a card, then end your turn.';}
-function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor${marker()?'<span class="hr-note">~ House Rules ~</span>':''}</h1><div class="status">${statusText()}</div>${fsButton('data-act')}<button class="ghost" data-act="quit">${quitArm&&Date.now()-quitArm<3000?'Tap again to quit':'Quit'}</button>`}
+function renderHud(){$('#hud').innerHTML=`<h1>Hearth &amp; Harbor${marker()?'<span class="hr-note">~ House Rules ~</span>':''}</h1><div class="status">${statusText()}</div>${won()?'<button class="ghost" data-act="stats">Stats</button>':''}${fsButton('data-act')}<button class="ghost" data-act="quit">${quitArm&&Date.now()-quitArm<3000?'Tap again to quit':'Quit'}</button>`}
 function renderMapCtl(spect,my,main){const el=$('#mapctl');
   if(spect||won()){el.innerHTML='';return}
   if(ME<0||G.cur!==ME||G.phase==='setup'){el.innerHTML='';return}
