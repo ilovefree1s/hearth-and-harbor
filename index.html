@@ -277,7 +277,7 @@ select,input{font:inherit;border:1px solid var(--line);border-radius:7px;padding
 <div id="toast" class="toast" hidden></div>
 <div id="turnflash" hidden></div>
 <div id="alertbox" role="status" hidden></div>
-<div id="version" aria-label="Version">v1.11</div>
+<div id="version" aria-label="Version">v1.12</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="crdice.js"></script>
@@ -310,7 +310,7 @@ const isLight=c=>c==='#f2efe6';
 const colorName=c=>(COLORS.find(x=>x.c===c)||{n:'Color'}).n;
 function freeColor(pref,taken){if(pref&&!taken.includes(pref))return pref;return COLORS.map(x=>x.c).find(c=>!taken.includes(c))}
 const BOTNAMES=['Marga','Tobin','Esk','Wren','Corin','Ilsa'];
-const VERSION='1.11';
+const VERSION='1.12';
 const S=60,SQ3=Math.sqrt(3),WIN=10,AI_PACE=1.3;
 const pips=n=>n?6-Math.abs(7-n):0;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};

@@ -905,11 +905,11 @@ var DIE_CLACK = 0.95;
 var DIE_THROWS = {
   // Carried slowly over the line: rolled out of the hand, low, going over a few
   // times up the felt before it stops.
-  roll: { lift: 650, spread: 0.12, side: 250, hop: 475, turn: 1.0, wobble: 138, twirl: 300 },
+  roll: { lift: 650, spread: 0.12, side: 250, hop: 475, turn: 1.2, wobble: 166, twirl: 360 },
   // Flicked: thrown hard, off the felt, bouncing and tumbling, then rolling out.
   // Hard for a felt the size of a phone: at 1950 it crossed the whole felt in
   // under half a second and spun three times a second.
-  throw: { lift: 938, spread: 0.12, side: 750, hop: 1438, turn: 1.0, wobble: 300, twirl: 475 }
+  throw: { lift: 938, spread: 0.12, side: 750, hop: 1438, turn: 1.2, wobble: 360, twirl: 570 }
 };
 /* How fast the air takes a tumble away, per second. Without it a die turned over
    at full rate for as long as it was off the felt. */
