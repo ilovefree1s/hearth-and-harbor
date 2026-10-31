@@ -281,6 +281,7 @@ table.stats tr.sth td{border-top:none;padding-top:10px;font-size:10.5px;font-wei
 .roll-chip.landing .mini{visibility:hidden}
 #version[data-rt]::after{content:" \25CF";color:#ff6b5e}
 #version[data-rt="SUBSCRIBED"]::after{color:#5fd38d}
+#cpuroll i{position:absolute;left:0;right:0;bottom:100%;margin-bottom:6px;text-align:center;font-style:normal;font-size:14px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.9);white-space:nowrap}
 .num.mk{font-family:'Kalam','Comic Sans MS',cursive;font-weight:700;font-size:19px}
 
 </style>
@@ -294,10 +295,10 @@ table.stats tr.sth td{border-top:none;padding-top:10px;font-size:10.5px;font-wei
 <div id="toast" class="toast" hidden></div>
 <div id="turnflash" hidden></div>
 <div id="alertbox" role="status" hidden></div>
-<div id="version" aria-label="Version">v1.19</div>
+<div id="version" aria-label="Version">v1.20</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
-<script src="crdice.js?v=1.19"></script>
+<script src="crdice.js?v=1.20"></script>
 <script>
 /* ===== Your Supabase project (Project Settings → API) ===== */
 const CONFIG={
@@ -327,7 +328,7 @@ const isLight=c=>c==='#f2efe6';
 const colorName=c=>(COLORS.find(x=>x.c===c)||{n:'Color'}).n;
 function freeColor(pref,taken){if(pref&&!taken.includes(pref))return pref;return COLORS.map(x=>x.c).find(c=>!taken.includes(c))}
 const BOTNAMES=['Marga','Tobin','Esk','Wren','Corin','Ilsa'];
-const VERSION='1.19';
+const VERSION='1.20';
 const S=60,SQ3=Math.sqrt(3),WIN=10,AI_PACE=1.3;
 const pips=n=>n?6-Math.abs(7-n):0;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -994,7 +995,10 @@ function renderBoard(){const hv=hotVerts(),he=hotEdges(),ht=hotTiles();const MK=
   $('#board').innerHTML=s}
 /* CPU roll: two dice flicker through faces in place, slowing down, then settle. */
 /* someone else's Self roll, played over this board as it happens */
-function onDiceCast(p){if(!p||p.by===ME||!G||!G.players||!window.CRDice)return;const pl=G.players[p.by];if(!pl)return;
+function onDiceCast(p){if(!p||p.by===ME||!G||!G.players)return;const pl=G.players[p.by];if(!pl)return;
+  if(p.k==='cpu'){const ok=n=>Number.isInteger(n)&&n>=1&&n<=6;if(!ok(p.a)||!ok(p.b)||!Array.isArray(p.seq)||p.seq.length>40||!p.seq.every(q=>Array.isArray(q)&&ok(q[0])&&ok(q[1])))return;
+    cpuShow(p,items=>landDice(items,{p:p.by,a:p.a,b:p.b}),`<span style="color:${isLight(pl.color)?'#fff':pl.color};filter:brightness(1.25)">${esc(nm(p.by))}</span> is rolling`);return}
+  if(!window.CRDice)return;
   CRDice.watch(p,document.querySelector('.svgbox'),`<span style="color:${isLight(pl.color)?'#fff':pl.color};filter:brightness(1.25)">${esc(nm(p.by))}</span> is rolling`,(items,v)=>landDice(items,{p:p.by,a:v[0],b:v[1]}))}
 /* landed dice fly down into the belt and drop into the newest chip */
 function landDice(items,hold){if(!items||!items.length)return;L.hold=hold;renderBelt();
@@ -1010,15 +1014,22 @@ function landDice(items,hold){if(!items||!items.length)return;L.hold=hold;render
     w.style.transition=`left .55s cubic-bezier(.45,0,.35,1) ${d}ms,top .55s cubic-bezier(.6,0,.25,1) ${d}ms,transform .55s ease-in-out ${d}ms`;
     w.style.left=x+'px';w.style.top=y+'px';w.style.transform=`rotate(${r}deg) scale(${s})`})));
   setTimeout(()=>{L.hold=null;renderBelt();layer.remove()},560+70*(ws.length-1)+40)}
-function cpuRoll(done){if(L.cpuRolling)return;L.cpuRolling=true;const box=document.querySelector('.svgbox');
+/* CPU roll: the whole flicker is worked out up front, so every phone at the table
+   can play exactly the same one. */
+function cpuPlan(){const r=()=>1+(Math.random()*6|0),a=r(),b=r(),seq=[];let last=[0,0];
+  for(let k=0;k<16;k++){let x,y;do{x=r()}while(x===last[0]);do{y=r()}while(y===last[1]);last=[x,y];seq.push(last)}
+  return {a,b,seq}}
+function cpuShow(plan,onEnd,label){const box=document.querySelector('.svgbox');if(!box)return;
   let el=document.getElementById('cpuroll');if(!el){el=document.createElement('div');el.id='cpuroll';box.appendChild(el)}
-  const r=()=>1+(Math.random()*6|0),a=r(),b=r();let k=0,last=[0,0];const N=16;
-  const face=()=>{let x,y;do{x=r()}while(x===last[0]);do{y=r()}while(y===last[1]);last=[x,y];return last};
-  el.className='';el.hidden=false;
-  const tick=()=>{if(k<N){const [x,y]=face();el.innerHTML=die(x)+die(y);k++;setTimeout(tick,40+k*k*.6)}
-    else{el.innerHTML=die(a)+die(b)+`<b>${a+b}</b>`;el.className='done';setTimeout(()=>{const items=[...el.querySelectorAll('.die')].map(d=>{const r=d.getBoundingClientRect();return {node:d.cloneNode(true),size:r.width,scale:1,rot:0,cx:r.left+r.width/2,cy:r.top+r.height/2}});
-      el.hidden=true;L.cpuRolling=false;const who=G.cur;done([a,b]);landDice(items,{p:who,a,b})},700)}};
+  const tag=label?`<i>${label}</i>`:'';let k=0;el.className='';el.hidden=false;
+  const tick=()=>{if(k<plan.seq.length){const [x,y]=plan.seq[k];el.innerHTML=tag+die(x)+die(y);k++;setTimeout(tick,40+k*k*.6)}
+    else{el.innerHTML=tag+die(plan.a)+die(plan.b)+`<b>${plan.a+plan.b}</b>`;el.className='done';
+      setTimeout(()=>{const items=[...el.querySelectorAll('.die')].map(d=>{const r=d.getBoundingClientRect();return {node:d.cloneNode(true),size:r.width,scale:1,rot:0,cx:r.left+r.width/2,cy:r.top+r.height/2}});
+        el.hidden=true;onEnd(items)},700)}};
   tick()}
+function cpuRoll(done){if(L.cpuRolling)return;L.cpuRolling=true;const plan=cpuPlan(),who=G.cur;
+  if(chan)chan.send({type:'broadcast',event:'dice',payload:Object.assign({k:'cpu',by:ME},plan)});
+  cpuShow(plan,items=>{L.cpuRolling=false;done([plan.a,plan.b]);landDice(items,{p:who,a:plan.a,b:plan.b})})}
 function die(n){if(!n)return `<svg class="die blank" viewBox="0 0 40 40"><rect x="1" y="1" width="38" height="38" rx="8"/></svg>`;
   const D={1:[[2,2]],2:[[1,1],[3,3]],3:[[1,1],[2,2],[3,3]],4:[[1,1],[3,1],[1,3],[3,3]],5:[[1,1],[3,1],[2,2],[1,3],[3,3]],6:[[1,1],[3,1],[1,2],[3,2],[1,3],[3,3]]};
   return `<svg class="die" viewBox="0 0 40 40" aria-label="${n}"><rect x="1" y="1" width="38" height="38" rx="8"/>${D[n].map(([x,y])=>`<circle cx="${x*10}" cy="${y*10}" r="3.8"/>`).join('')}</svg>`}
