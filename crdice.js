@@ -1452,7 +1452,7 @@ function spaceOut(pos, gap, ratio, pad) {
    smoothing between samples. Nothing is decided on the watching phones: the
    number is still whatever the thrower's dice landed on. */
 var castFn = null, castQ = [], castT0 = 0, castLastS = 0, castLastF = 0, castId = 0;
-var CAST_SAMPLE = 33, CAST_FLUSH = 110;
+var CAST_SAMPLE = 33, CAST_FLUSH = 200;
 function r3(n) { return Math.round(n * 1000) / 1000; }
 function restPoses(d) {
   var at = dicePlaces(d);
@@ -1503,7 +1503,7 @@ function landItems(root, poses) {
   return out;
 }
 /* ---- watching ---- */
-var W = null, WATCH_DELAY = 450;
+var W = null, WATCH_DELAY = 600;
 function watchFeed(p, host, label, onLand) {
   if (!p || !host) return;
   if (p.k === "s") {
