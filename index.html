@@ -278,6 +278,7 @@ table.stats td.stmax{font-weight:800;color:#b3261e}
 table.stats tr.sth td{border-top:none;padding-top:10px;font-size:10.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);text-align:left}
 .stc{display:inline-block;min-width:38px;padding:2px 4px;border-radius:5px;color:#fff;font-size:11px;font-weight:800;text-shadow:0 1px 0 rgba(0,0,0,.35)}
 .stc.light{color:var(--ink);text-shadow:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.35)}
+.roll-chip.landing .mini{visibility:hidden}
 .num.mk{font-family:'Kalam','Comic Sans MS',cursive;font-weight:700;font-size:19px}
 
 </style>
@@ -291,7 +292,7 @@ table.stats tr.sth td{border-top:none;padding-top:10px;font-size:10.5px;font-wei
 <div id="toast" class="toast" hidden></div>
 <div id="turnflash" hidden></div>
 <div id="alertbox" role="status" hidden></div>
-<div id="version" aria-label="Version">v1.16</div>
+<div id="version" aria-label="Version">v1.17</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
 <script src="crdice.js"></script>
@@ -324,7 +325,7 @@ const isLight=c=>c==='#f2efe6';
 const colorName=c=>(COLORS.find(x=>x.c===c)||{n:'Color'}).n;
 function freeColor(pref,taken){if(pref&&!taken.includes(pref))return pref;return COLORS.map(x=>x.c).find(c=>!taken.includes(c))}
 const BOTNAMES=['Marga','Tobin','Esk','Wren','Corin','Ilsa'];
-const VERSION='1.16';
+const VERSION='1.17';
 const S=60,SQ3=Math.sqrt(3),WIN=10,AI_PACE=1.3;
 const pips=n=>n?6-Math.abs(7-n):0;
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
@@ -829,7 +830,7 @@ const onAct=async e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)r
     return}
   if(ME<0)return;
   if(a==='cancel'){G.offer=null;log(me,'withdrew a trade offer');render();await push();return}
-  if(a==='roll'||a==='cpuroll'){if(L.flow||L.cpuRolling)return;const go=async v=>{if(!(G&&G.cur===ME&&G.phase==='roll'))return;L.flow=true;L.rolledAt=Date.now();render();try{await rollDice(v)}finally{L.flow=false}checkWin();render();await push()};if(a==='cpuroll'){cpuRoll(go);return}if(window.CRDice){if(!CRDice.isOpen())CRDice.open(go,{cast:p=>{if(chan)chan.send({type:'broadcast',event:'dice',payload:Object.assign({by:ME},p)})}})}else await go();return}
+  if(a==='roll'||a==='cpuroll'){if(L.flow||L.cpuRolling)return;const go=async v=>{if(!(G&&G.cur===ME&&G.phase==='roll'))return;L.flow=true;L.rolledAt=Date.now();render();try{await rollDice(v)}finally{L.flow=false}checkWin();render();await push()};if(a==='cpuroll'){cpuRoll(go);return}if(window.CRDice){if(!CRDice.isOpen())CRDice.open(go,{cast:p=>{if(chan)chan.send({type:'broadcast',event:'dice',payload:Object.assign({by:ME},p)})},land:(items,v)=>landDice(items,{p:ME,a:v[0],b:v[1]})})}else await go();return}
   if(a==='end'){if(Date.now()-(L.rolledAt||0)<1000)return;
     if(Date.now()-(L.endArm||0)>=3000){L.endArm=Date.now();render();clearTimeout(L.endArmT);L.endArmT=setTimeout(()=>{L.endArm=0;render()},3000);return}
     L.endArm=0;clearTimeout(L.endArmT);L.mode=null;nextTurn();G.botRunner=ME;render();await push();afterChange();return}
@@ -992,14 +993,29 @@ function renderBoard(){const hv=hotVerts(),he=hotEdges(),ht=hotTiles();const MK=
 /* CPU roll: two dice flicker through faces in place, slowing down, then settle. */
 /* someone else's Self roll, played over this board as it happens */
 function onDiceCast(p){if(!p||p.by===ME||!G||!G.players||!window.CRDice)return;const pl=G.players[p.by];if(!pl)return;
-  CRDice.watch(p,document.querySelector('.svgbox'),`<span style="color:${isLight(pl.color)?'#fff':pl.color};filter:brightness(1.25)">${esc(nm(p.by))}</span> is rolling`)}
+  CRDice.watch(p,document.querySelector('.svgbox'),`<span style="color:${isLight(pl.color)?'#fff':pl.color};filter:brightness(1.25)">${esc(nm(p.by))}</span> is rolling`,(items,v)=>landDice(items,{p:p.by,a:v[0],b:v[1]}))}
+/* landed dice fly down into the belt and drop into the newest chip */
+function landDice(items,hold){if(!items||!items.length)return;L.hold=hold;renderBelt();
+  const tg=[...document.querySelectorAll('#belt .roll-chip.latest .mini .die')],br=$('#belt').getBoundingClientRect();
+  const layer=document.createElement('div');layer.className='crview flylayer';layer.innerHTML='<div class="dicefield"></div>';document.body.appendChild(layer);
+  const ws=items.map((it,k)=>{const w=document.createElement('div');w.className='flyw';const h=it.size/2;
+    Object.assign(w.style,{left:it.cx+'px',top:it.cy+'px',width:it.size+'px',height:it.size+'px',marginLeft:-h+'px',marginTop:-h+'px',transform:`rotate(${it.rot}deg) scale(${it.scale})`});
+    Object.assign(it.node.style,{position:'absolute',left:'0',top:'0',width:'100%',height:'100%',transform:'none',margin:'0',opacity:'1',transition:'none'});
+    w.appendChild(it.node);layer.firstChild.appendChild(w);
+    const t=tg[k]?tg[k].getBoundingClientRect():{left:br.left+16+k*29,top:br.top+br.height/2-13,width:26,height:26};
+    const rot=((it.rot%360)+360)%360;return [w,t.left+t.width/2,t.top+t.height/2,t.width/it.size,rot>180?360:0]});
+  requestAnimationFrame(()=>requestAnimationFrame(()=>ws.forEach(([w,x,y,s,r],k)=>{const d=k*70;
+    w.style.transition=`left .55s cubic-bezier(.45,0,.35,1) ${d}ms,top .55s cubic-bezier(.6,0,.25,1) ${d}ms,transform .55s ease-in-out ${d}ms`;
+    w.style.left=x+'px';w.style.top=y+'px';w.style.transform=`rotate(${r}deg) scale(${s})`})));
+  setTimeout(()=>{L.hold=null;renderBelt();layer.remove()},560+70*(ws.length-1)+40)}
 function cpuRoll(done){if(L.cpuRolling)return;L.cpuRolling=true;const box=document.querySelector('.svgbox');
   let el=document.getElementById('cpuroll');if(!el){el=document.createElement('div');el.id='cpuroll';box.appendChild(el)}
   const r=()=>1+(Math.random()*6|0),a=r(),b=r();let k=0,last=[0,0];const N=16;
   const face=()=>{let x,y;do{x=r()}while(x===last[0]);do{y=r()}while(y===last[1]);last=[x,y];return last};
   el.className='';el.hidden=false;
   const tick=()=>{if(k<N){const [x,y]=face();el.innerHTML=die(x)+die(y);k++;setTimeout(tick,40+k*k*.6)}
-    else{el.innerHTML=die(a)+die(b)+`<b>${a+b}</b>`;el.className='done';setTimeout(()=>{el.hidden=true;L.cpuRolling=false;done([a,b])},800)}};
+    else{el.innerHTML=die(a)+die(b)+`<b>${a+b}</b>`;el.className='done';setTimeout(()=>{const items=[...el.querySelectorAll('.die')].map(d=>{const r=d.getBoundingClientRect();return {node:d.cloneNode(true),size:r.width,scale:1,rot:0,cx:r.left+r.width/2,cy:r.top+r.height/2}});
+      el.hidden=true;L.cpuRolling=false;const who=G.cur;done([a,b]);landDice(items,{p:who,a,b})},700)}};
   tick()}
 function die(n){if(!n)return `<svg class="die blank" viewBox="0 0 40 40"><rect x="1" y="1" width="38" height="38" rx="8"/></svg>`;
   const D={1:[[2,2]],2:[[1,1],[3,3]],3:[[1,1],[2,2],[3,3]],4:[[1,1],[3,1],[1,3],[3,3]],5:[[1,1],[3,1],[2,2],[1,3],[3,3]],6:[[1,1],[3,1],[1,2],[3,2],[1,3],[3,3]]};
@@ -1043,7 +1059,8 @@ function renderMapScore(){
 function renderBelt(){const el=$('#belt'),rs=(G.rolls||[]).slice().reverse();
   if(!rs.length){el.innerHTML='<span class="belt-empty">Dice rolls will show here</span>';return}
   el.innerHTML=rs.map((r,k)=>{const p=G.players[r.p],s=r.a+r.b;
-    return `<div class="roll-chip${k===0?' latest':''}${s===7?' seven':''}" style="--pc:${p.color}" title="${nm(r.p)} rolled ${r.a} + ${r.b}">
+    const hold=k===0&&L.hold&&r.p===L.hold.p&&r.a===L.hold.a&&r.b===L.hold.b;
+    return `<div class="roll-chip${k===0?' latest':''}${hold?' landing':''}${s===7?' seven':''}" style="--pc:${p.color}" title="${nm(r.p)} rolled ${r.a} + ${r.b}">
       ${k===0?`<span class="mini">${die(r.a)}${die(r.b)}</span>`:''}<b>${s}</b>${k===0?`<small>${nm(r.p)}</small>`:''}</div>`}).join('')}
 /* a 1-second banner in your color when your turn starts */
 let flashT=null;
