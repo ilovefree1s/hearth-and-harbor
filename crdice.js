@@ -1503,7 +1503,7 @@ function landItems(root, poses) {
   return out;
 }
 /* ---- watching ---- */
-var W = null, WATCH_DELAY = 600;
+var W = null, WATCH_DELAY = 600, WATCH_BLEND = 750, WATCH_GROW = 900;
 function watchFeed(p, host, label, onLand) {
   if (!p || !host) return;
   if (p.k === "s") {
@@ -1524,7 +1524,8 @@ function watchFeed(p, host, label, onLand) {
       }).join("") + '</div>';
     el.hidden = false; el.classList.remove("out");
     // Every die where it lay as the throw began; the thrown ones then move off from there.
-    p.rest.forEach(function (r, i) { watchRest(i, r); });
+    // Dice still to be thrown wait out of sight; they come in from the corner.
+    p.rest.forEach(function (r, i) { if (p.live.indexOf(i) === -1) watchRest(i, r); else watchDie(i).style.opacity = "0"; });
     return;
   }
   if (!W || p.id !== W.id) return;
@@ -1557,11 +1558,18 @@ function watchStep(now) {
       var A = a[1][n], B = b[1][n], el = watchDie(di);
       if (!A || !el) return;
       var L = function (j) { return A[j] + (B[j] - A[j]) * u; };
+      // Hearth & Harbor: the throw comes in from the board's bottom-left corner and
+      // the dice grow to full size as they go, settling onto the thrower's own path.
+      var F0 = F[0][1][n], ez = function (q) { q = Math.max(0, Math.min(1, q)); return 1 - Math.pow(1 - q, 3); };
+      var pull = 1 - ez(t / WATCH_BLEND), grow = 0.3 + 0.7 * ez(t / WATCH_GROW);
+      var cornerX = (W.vs * 74 * 0.3) / W.fw + 0.04 + n * 0.07, cornerY = 0.93;
+      var px = L(0) + (cornerX - F0[0]) * pull, py = L(1) + (cornerY - F0[1]) * pull;
+      el.style.opacity = "1";
       var turn = A[3] + (((B[3] - A[3] + 540) % 360) - 180) * u;
       el.classList.toggle("flat", A[3] !== 0);
-      el.style.transform = "translate(" + (L(0) * W.fw).toFixed(1) + "px, " + (L(1) * W.fh).toFixed(1) +
+      el.style.transform = "translate(" + (px * W.fw).toFixed(1) + "px, " + (py * W.fh).toFixed(1) +
         "px) translate(-50%, -50%)" + (A[3] !== 0 ? " rotate(" + turn.toFixed(1) + "deg)" : "") +
-        " scale(" + (W.vs * W.start.sc * L(2)).toFixed(3) + ")";
+        " scale(" + (W.vs * W.start.sc * L(2) * grow).toFixed(3) + ")";
       var m = []; for (var j = 4; j < 13; j++) m.push(L(j));
       el.firstChild.style.transform = m3css(m3fix(m));
     });
