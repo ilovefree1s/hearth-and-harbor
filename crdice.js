@@ -5,7 +5,7 @@
 var app=document.createElement('div');app.id='crdice';app.hidden=true;
 document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(app)});
 if(document.body)document.body.appendChild(app);
-var st=document.createElement('style');st.textContent="#crdice .dicefield { position: relative; flex: 1 1 auto; min-height: 300px;\n               touch-action: none; perspective: 900px; }#crdice .dicefield .die { position: absolute; transform: translate(-50%, -50%); }#crdice .dicefield::before {\n    content: \"\"; position: absolute; inset: 2px; border-radius: 12px;\n    border: 1px solid rgba(255, 255, 255, 0.16); pointer-events: none;\n  }#crdice .dicetally { text-align: center; margin: 0 0 6px; font-size: 15px; }#crdice .dicetally .who { color: var(--sage); }#crdice .dicetally b { color: #fff; font-weight: 900; }#crdice .dicewin { font-size: 20px; margin: 0 0 8px; }#crdice .dicegrab {\n    position: absolute; left: 0; right: 0; bottom: 6px; z-index: 1;\n    margin: 0; text-align: center; font-size: 14px; pointer-events: none;\n  }#crdice .throwline {\n    position: absolute; left: 7%; right: 7%; bottom: 50%; height: 0; z-index: 1;\n    border-top: 2px dashed rgba(77, 195, 255, 0.3); pointer-events: none;\n  }#crdice .throwline span {\n    position: absolute; left: 50%; top: 8px; transform: translateX(-50%);\n    white-space: nowrap; font-size: 11px; font-weight: 900; letter-spacing: 2px;\n    text-transform: uppercase; color: rgba(77, 195, 255, 0.45);\n  }#crdice .dicefield.rolling .die { transition: none; }#crdice .dicefield:not(.rolling) .die {\n    transition: left 420ms cubic-bezier(0.3, 0.9, 0.3, 1),\n                top 420ms cubic-bezier(0.3, 0.9, 0.3, 1);\n  }#crdice .dicefield .die.set { opacity: 0.72; transform: translate(-50%, -50%) scale(0.5); }#crdice .dicefield .die.held { z-index: 2; will-change: transform;\n                         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6),\n                                     0 0 18px rgba(77, 195, 255, 0.5); }#crdice .dicefield .die.held, #crdice .dicefield.rolling .die.held { transition: none; }#crdice .modal.sgcoin, #crdice .modal.sgdice {\n    display: flex; flex-direction: column;\n    padding-bottom: calc(30px + env(safe-area-inset-bottom));\n  }#crdice .modal.sgcoin { justify-content: flex-end; }#crdice .sgcoin .label { margin: 44px 0 auto; }#crdice .sgdice .label { margin: 44px 0 12px; }#crdice .coinbox { display: flex; justify-content: center; margin: 0; }#crdice .tossable { touch-action: none; cursor: grab; }#crdice .dicefield, #crdice .coinbox { user-select: none; -webkit-user-select: none; }#crdice .dicefield .die { cursor: grab; }#crdice .dicefield .die.held { cursor: grabbing; }#crdice .tossable.tossing { animation: cointoss 1200ms; }\n  @keyframes cointoss {\n    0% { transform: translateY(0); animation-timing-function: ease-out; }\n    50% { transform: translateY(var(--toss, -34vh)); animation-timing-function: ease-in; }\n    100% { transform: translateY(0); }\n  }#crdice .coin {\n    position: relative;\n    width: min(56%, 200px); aspect-ratio: 1;\n    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55));\n  }#crdice .coin svg { display: block; width: 100%; height: 100%; }#crdice .coin[data-face=\"HEADS\"] .ctails, #crdice .coin[data-face=\"TAILS\"] .cheads { display: none; }#crdice .coin.spinning { animation: coinspin 150ms linear infinite; }\n  @keyframes coinspin { 50% { transform: scaleY(0.06); } }#crdice .die { width: 74px; height: 74px; perspective: 700px; }#crdice .cube { position: absolute; inset: 0; transform-style: preserve-3d;\n          transition: transform 260ms ease-out; }#crdice .dicefield.rolling .cube { transition: none; }#crdice .face {\n    position: absolute; inset: 0; background: #F4F6FA; border-radius: 12px;\n    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);\n    padding: 11px; box-sizing: border-box; gap: 3px;\n  }#crdice .dicefield .die { filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.45)); }#crdice .dicefield:not(.rolling) .die { border-radius: 13px; overflow: hidden; }#crdice .dicefield .die.flat { border-radius: 13px; overflow: hidden; }#crdice .face.f1 { transform: translateZ(37px); }#crdice .face.f6 { transform: rotateY(180deg) translateZ(37px); }#crdice .face.f3 { transform: rotateY(90deg) translateZ(37px); }#crdice .face.f4 { transform: rotateY(-90deg) translateZ(37px); }#crdice .face.f5 { transform: rotateX(90deg) translateZ(37px); }#crdice .face.f2 { transform: rotateX(-90deg) translateZ(37px); }#crdice .pip { border-radius: 50%; }#crdice .pip.on { background: #10182A; }#crdice .dicecount { flex: 0 0 auto; min-width: 84px; text-align: center;\n               font-size: 18px; font-weight: 900; color: var(--sage); }#crdice .dicesteps {\n    position: absolute; right: 6px; top: calc(env(safe-area-inset-top) + 10px);\n    z-index: 2; height: var(--tap);\n    display: flex; align-items: center; gap: 5px;\n  }#crdice .dicesteps .step {\n    width: 36px; height: 36px; min-height: 36px; flex: 0 0 36px;\n    font-size: 20px; border-radius: 10px;\n  }#crdice .dicesteps .dicecount { min-width: 44px; font-size: 13px; }"+"#crdice{position:fixed;inset:0;z-index:60;background:#0c1e25;color:#edf1ea;--sage:#9fc5b0;--self:#ffd23f;--tap:44px;\n  padding:calc(10px + env(safe-area-inset-top,0px)) 12px calc(14px + env(safe-area-inset-bottom,0px));box-sizing:border-box;touch-action:none}\n#crdice[hidden]{display:none}\n#crdice .crbox{height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column}\n#crdice .crhead{position:relative;display:flex;align-items:center;justify-content:space-between;height:var(--tap)}\n#crdice .crx{background:none;border:1px solid rgba(255,255,255,.25);color:#edf1ea;border-radius:10px;padding:8px 14px;font-size:15px;font-weight:700;min-height:0}\n#crdice .crx:disabled{opacity:.35}\n#crdice .crlbl{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sage)}\n#crdice .sgtop{position:absolute;left:0;right:0;top:0;height:var(--tap);display:flex;align-items:center;justify-content:center;color:var(--self);font-size:30px;font-weight:900;pointer-events:none;font-variant-numeric:tabular-nums}\n#crdice .crhint{text-align:center;margin:8px 0 10px;font-size:14px;color:#fff;line-height:1.35}\n#crdice .dicefield{background:radial-gradient(ellipse at 50% 40%,#1f5a46,#123a2e);border-radius:14px;box-shadow:inset 0 0 40px rgba(0,0,0,.45)}\n#crdice .dicegrab{color:rgba(255,255,255,.75)}\n";
+var st=document.createElement('style');st.textContent="#crdice .dicefield, .crview .dicefield { position: relative; flex: 1 1 auto; min-height: 300px;\n               touch-action: none; perspective: 900px; }#crdice .dicefield .die, .crview .dicefield .die { position: absolute; transform: translate(-50%, -50%); }#crdice .dicefield::before, .crview .dicefield::before {\n    content: \"\"; position: absolute; inset: 2px; border-radius: 12px;\n    border: 1px solid rgba(255, 255, 255, 0.16); pointer-events: none;\n  }#crdice .dicetally, .crview .dicetally { text-align: center; margin: 0 0 6px; font-size: 15px; }#crdice .dicetally .who, .crview .dicetally .who { color: var(--sage); }#crdice .dicetally b, .crview .dicetally b { color: #fff; font-weight: 900; }#crdice .dicewin, .crview .dicewin { font-size: 20px; margin: 0 0 8px; }#crdice .dicegrab, .crview .dicegrab {\n    position: absolute; left: 0; right: 0; bottom: 6px; z-index: 1;\n    margin: 0; text-align: center; font-size: 14px; pointer-events: none;\n  }#crdice .throwline, .crview .throwline {\n    position: absolute; left: 7%; right: 7%; bottom: 50%; height: 0; z-index: 1;\n    border-top: 2px dashed rgba(77, 195, 255, 0.3); pointer-events: none;\n  }#crdice .throwline span, .crview .throwline span {\n    position: absolute; left: 50%; top: 8px; transform: translateX(-50%);\n    white-space: nowrap; font-size: 11px; font-weight: 900; letter-spacing: 2px;\n    text-transform: uppercase; color: rgba(77, 195, 255, 0.45);\n  }#crdice .dicefield.rolling .die, .crview .dicefield.rolling .die { transition: none; }#crdice .dicefield:not(.rolling) .die, .crview .dicefield:not(.rolling) .die {\n    transition: left 420ms cubic-bezier(0.3, 0.9, 0.3, 1),\n                top 420ms cubic-bezier(0.3, 0.9, 0.3, 1);\n  }#crdice .dicefield .die.set, .crview .dicefield .die.set { opacity: 0.72; transform: translate(-50%, -50%) scale(0.5); }#crdice .dicefield .die.held, .crview .dicefield .die.held { z-index: 2; will-change: transform;\n                         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6),\n                                     0 0 18px rgba(77, 195, 255, 0.5); }#crdice .dicefield .die.held, .crview .dicefield .die.held, #crdice .dicefield.rolling .die.held, .crview .dicefield.rolling .die.held { transition: none; }#crdice .modal.sgcoin, .crview .modal.sgcoin, #crdice .modal.sgdice, .crview .modal.sgdice {\n    display: flex; flex-direction: column;\n    padding-bottom: calc(30px + env(safe-area-inset-bottom));\n  }#crdice .modal.sgcoin, .crview .modal.sgcoin { justify-content: flex-end; }#crdice .sgcoin .label, .crview .sgcoin .label { margin: 44px 0 auto; }#crdice .sgdice .label, .crview .sgdice .label { margin: 44px 0 12px; }#crdice .coinbox, .crview .coinbox { display: flex; justify-content: center; margin: 0; }#crdice .tossable, .crview .tossable { touch-action: none; cursor: grab; }#crdice .dicefield, .crview .dicefield, #crdice .coinbox, .crview .coinbox { user-select: none; -webkit-user-select: none; }#crdice .dicefield .die, .crview .dicefield .die { cursor: grab; }#crdice .dicefield .die.held, .crview .dicefield .die.held { cursor: grabbing; }#crdice .tossable.tossing, .crview .tossable.tossing { animation: cointoss 1200ms; }\n  @keyframes cointoss {\n    0% { transform: translateY(0); animation-timing-function: ease-out; }\n    50% { transform: translateY(var(--toss, -34vh)); animation-timing-function: ease-in; }\n    100% { transform: translateY(0); }\n  }#crdice .coin, .crview .coin {\n    position: relative;\n    width: min(56%, 200px); aspect-ratio: 1;\n    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.55));\n  }#crdice .coin svg, .crview .coin svg { display: block; width: 100%; height: 100%; }#crdice .coin[data-face=\"HEADS\"] .ctails, .crview .coin[data-face=\"HEADS\"] .ctails, #crdice .coin[data-face=\"TAILS\"] .cheads, .crview .coin[data-face=\"TAILS\"] .cheads { display: none; }#crdice .coin.spinning, .crview .coin.spinning { animation: coinspin 150ms linear infinite; }\n  @keyframes coinspin { 50% { transform: scaleY(0.06); } }#crdice .die, .crview .die { width: 74px; height: 74px; perspective: 700px; }#crdice .cube, .crview .cube { position: absolute; inset: 0; transform-style: preserve-3d;\n          transition: transform 260ms ease-out; }#crdice .dicefield.rolling .cube, .crview .dicefield.rolling .cube { transition: none; }#crdice .face, .crview .face {\n    position: absolute; inset: 0; background: #F4F6FA; border-radius: 12px;\n    display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);\n    padding: 11px; box-sizing: border-box; gap: 3px;\n  }#crdice .dicefield .die, .crview .dicefield .die { filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.45)); }#crdice .dicefield:not(.rolling) .die, .crview .dicefield:not(.rolling) .die { border-radius: 13px; overflow: hidden; }#crdice .dicefield .die.flat, .crview .dicefield .die.flat { border-radius: 13px; overflow: hidden; }#crdice .face.f1, .crview .face.f1 { transform: translateZ(37px); }#crdice .face.f6, .crview .face.f6 { transform: rotateY(180deg) translateZ(37px); }#crdice .face.f3, .crview .face.f3 { transform: rotateY(90deg) translateZ(37px); }#crdice .face.f4, .crview .face.f4 { transform: rotateY(-90deg) translateZ(37px); }#crdice .face.f5, .crview .face.f5 { transform: rotateX(90deg) translateZ(37px); }#crdice .face.f2, .crview .face.f2 { transform: rotateX(-90deg) translateZ(37px); }#crdice .pip, .crview .pip { border-radius: 50%; }#crdice .pip.on, .crview .pip.on { background: #10182A; }#crdice .dicecount, .crview .dicecount { flex: 0 0 auto; min-width: 84px; text-align: center;\n               font-size: 18px; font-weight: 900; color: var(--sage); }#crdice .dicesteps, .crview .dicesteps {\n    position: absolute; right: 6px; top: calc(env(safe-area-inset-top) + 10px);\n    z-index: 2; height: var(--tap);\n    display: flex; align-items: center; gap: 5px;\n  }#crdice .dicesteps .step, .crview .dicesteps .step {\n    width: 36px; height: 36px; min-height: 36px; flex: 0 0 36px;\n    font-size: 20px; border-radius: 10px;\n  }#crdice .dicesteps .dicecount, .crview .dicesteps .dicecount { min-width: 44px; font-size: 13px; }"+"#crdice{position:fixed;inset:0;z-index:60;background:#0c1e25;color:#edf1ea;--sage:#9fc5b0;--self:#ffd23f;--tap:44px;\n  padding:calc(10px + env(safe-area-inset-top,0px)) 12px calc(14px + env(safe-area-inset-bottom,0px));box-sizing:border-box;touch-action:none}\n#crdice[hidden]{display:none}\n#crdice .crbox{height:100%;max-width:520px;margin:0 auto;display:flex;flex-direction:column}\n#crdice .crhead{position:relative;display:flex;align-items:center;justify-content:space-between;height:var(--tap)}\n#crdice .crx{background:none;border:1px solid rgba(255,255,255,.25);color:#edf1ea;border-radius:10px;padding:8px 14px;font-size:15px;font-weight:700;min-height:0}\n#crdice .crx:disabled{opacity:.35}\n#crdice .crlbl{font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--sage)}\n#crdice .sgtop{position:absolute;left:0;right:0;top:0;height:var(--tap);display:flex;align-items:center;justify-content:center;color:var(--self);font-size:30px;font-weight:900;pointer-events:none;font-variant-numeric:tabular-nums}\n#crdice .crhint{text-align:center;margin:8px 0 10px;font-size:14px;color:#fff;line-height:1.35}\n#crdice .dicefield{background:radial-gradient(ellipse at 50% 40%,#1f5a46,#123a2e);border-radius:14px;box-shadow:inset 0 0 40px rgba(0,0,0,.45)}\n#crdice .dicegrab{color:rgba(255,255,255,.75)}\n.crview{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;pointer-events:none;background:rgba(8,22,28,.35);transition:opacity .25s}\n.crview[hidden]{display:none}\n.crview.out{opacity:0}\n.crview .crvlbl{font-size:13px;font-weight:800;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);letter-spacing:.02em}\n.crview .crvlbl b{color:#ffd23f;font-size:16px;margin-left:4px}\n.crview .dicefield{background:radial-gradient(ellipse at 50% 40%,#1f5a46,#123a2e);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.5),inset 0 0 30px rgba(0,0,0,.45)}\n.crview .dicefield::before{display:none}\n";
 document.head.appendChild(st);
 var secret=null,onDone=null,curdRoll=null,disputeCall=null;
 var DICE_SOUND='dice.mp3';
@@ -35,7 +35,7 @@ function render(){
 }
 function close(){
   if(diceSim&&diceSim.raf)cancelAnimationFrame(diceSim.raf);
-  diceSim=null;secret=null;onDone=null;render();
+  diceSim=null;secret=null;onDone=null;castFn=null;render();
 }
 app.addEventListener('click',function(e){
   var b=e.target.closest&&e.target.closest('[data-cr="cancel"]');
@@ -1053,6 +1053,7 @@ function rollDice(kind, which, aim) {
   // its first frame could show them there for one.
   drawDiceSim(diceSim);
   diceSim.raf = requestAnimationFrame(diceStep);
+  castStart(diceSim);
 }
 
 /*
@@ -1284,6 +1285,7 @@ function diceStep(now) {
 
   // Draw each die once, where the steps left it.
   drawDiceSim(sim);
+  castFrame(sim, now);
 
   // Still for long enough: they have settled, wherever that turned out to be. The
   // cap is only there so a pathological bounce cannot run forever.
@@ -1364,6 +1366,7 @@ function diceStep(now) {
   parkSetDice(d);
   diceSim = null;
   d.rolling = false;
+  castEnd(d);
   // Straight off the dice, before anybody has had a chance to read them out.
   noteCurdRoll(d);
   shareDiceRoll(d);
@@ -1441,15 +1444,147 @@ function spaceOut(pos, gap, ratio, pad) {
     }
   }
 }
+/* ===== Hearth & Harbor: sending a throw to the table, and watching one ===== */
+/* The thrower's phone samples the dice 30 times a second and sends them in
+   small batches; every other phone plays them back a fixed half second behind,
+   smoothing between samples. Nothing is decided on the watching phones: the
+   number is still whatever the thrower's dice landed on. */
+var castFn = null, castQ = [], castT0 = 0, castLastS = 0, castLastF = 0, castId = 0;
+var CAST_SAMPLE = 33, CAST_FLUSH = 110;
+function r3(n) { return Math.round(n * 1000) / 1000; }
+function restPoses(d) {
+  var at = dicePlaces(d);
+  return d.vals.map(function (v, i) {
+    var o = dieRest(d, i);
+    return [r3(at[i].x), r3(at[i].y), r3(o.z), o.x, o.y, d.parked && d.parked.indexOf(i) !== -1 ? 1 : 0, v];
+  });
+}
+function castSend(p) { if (castFn) { try { castFn(p); } catch (e) { /* the throw goes on */ } } }
+function castFlush() { if (castQ.length) { castSend({ k: "f", id: castId, f: castQ }); castQ = []; } }
+function castStart(sim) {
+  if (!castFn) return;
+  castId = Date.now() % 1e9; castQ = []; castT0 = 0; castLastS = 0; castLastF = 0;
+  castSend({ k: "s", id: castId, w: Math.round(sim.w), h: Math.round(sim.h), sc: diceScale(sim.d),
+             live: sim.live, rest: restPoses(sim.d) });
+}
+function castFrame(sim, now) {
+  if (!castFn) return;
+  if (!castT0) castT0 = now;
+  if (castLastS && now - castLastS < CAST_SAMPLE) return;
+  castLastS = now;
+  var bodies = sim.bodies.map(function (b) {
+    var turn = b.flat ? b.rot : 0;
+    var m = b.flat ? m3mul(m3rot(0, 0, 1, -turn), b.m) : b.m;
+    return [r3(b.x / sim.w), r3(b.y / sim.h), r3(1 + (b.h || 0) * DIE_HOP_SCALE), r3(turn)].concat(m.map(r3));
+  });
+  castQ.push([Math.round(now - castT0), bodies]);
+  if (!castLastF) castLastF = now;
+  if (now - castLastF >= CAST_FLUSH) { castLastF = now; castFlush(); }
+}
+function castEnd(d) {
+  if (!castFn) return;
+  castFlush();
+  castSend({ k: "e", id: castId, rest: restPoses(d) });
+}
+
+/* ---- watching ---- */
+var W = null, WATCH_DELAY = 450;
+function watchFeed(p, host, label) {
+  if (!p || !host) return;
+  if (p.k === "s") {
+    if (W && W.raf) cancelAnimationFrame(W.raf);
+    if (W && W.hide) clearTimeout(W.hide);
+    var el = host.querySelector(".crview");
+    if (!el) { el = document.createElement("div"); el.className = "crview"; host.appendChild(el); }
+    W = { id: p.id, el: el, host: host, start: p, frames: [], t0: 0, done: null, raf: 0 };
+    var hb = host.getBoundingClientRect();
+    var fh = Math.max(120, hb.height - 34), fw = fh * p.w / p.h;
+    if (fw > hb.width - 16) { fw = hb.width - 16; fh = fw * p.h / p.w; }
+    W.fw = fw; W.fh = fh; W.vs = fw / p.w;
+    el.innerHTML = '<div class="crvlbl">' + (label || "Rolling") + '</div>' +
+      '<div class="dicefield rolling" style="width:' + fw.toFixed(0) + 'px;height:' + fh.toFixed(0) + 'px;flex:none;min-height:0">' +
+      p.rest.map(function (r, i) {
+        return '<div class="die" data-die="' + i + '" style="left:0;top:0"><div class="cube">' + dieFacesHtml() + '</div></div>';
+      }).join("") + '</div>';
+    el.hidden = false; el.classList.remove("out");
+    // Every die where it lay as the throw began; the thrown ones then move off from there.
+    p.rest.forEach(function (r, i) { watchRest(i, r); });
+    return;
+  }
+  if (!W || p.id !== W.id) return;
+  if (p.k === "f") {
+    if (!W.t0) { W.t0 = performance.now(); W.raf = requestAnimationFrame(watchStep); }
+    for (var i = 0; i < p.f.length; i++) W.frames.push(p.f[i]);
+  } else if (p.k === "e") {
+    W.done = p.rest;
+    if (!W.t0) watchFinish();
+  }
+}
+function watchDie(i) { return W.el.querySelector('[data-die="' + i + '"]'); }
+function watchRest(i, r) {
+  var el = watchDie(i); if (!el) return;
+  el.classList.add("flat");
+  el.style.transform = "translate(" + (r[0] / 100 * W.fw).toFixed(1) + "px, " + (r[1] / 100 * W.fh).toFixed(1) +
+    "px) translate(-50%, -50%) rotate(" + r[2] + "deg) scale(" + (W.vs * W.start.sc * (r[5] ? 0.5 : 1)).toFixed(3) + ")";
+  el.style.opacity = r[5] ? "0.72" : "1";
+  el.firstChild.style.transform = "rotateX(" + r[3] + "deg) rotateY(" + r[4] + "deg)";
+}
+function watchStep(now) {
+  if (!W) return;
+  var t = now - W.t0 - WATCH_DELAY, F = W.frames;
+  if (t >= 0 && F.length) {
+    var k = 0;
+    while (k < F.length - 1 && F[k + 1][0] <= t) k++;
+    var a = F[k], b = F[Math.min(k + 1, F.length - 1)];
+    var u = b[0] > a[0] ? Math.max(0, Math.min(1, (t - a[0]) / (b[0] - a[0]))) : 0;
+    W.start.live.forEach(function (di, n) {
+      var A = a[1][n], B = b[1][n], el = watchDie(di);
+      if (!A || !el) return;
+      var L = function (j) { return A[j] + (B[j] - A[j]) * u; };
+      var turn = A[3] + (((B[3] - A[3] + 540) % 360) - 180) * u;
+      el.classList.toggle("flat", A[3] !== 0);
+      el.style.transform = "translate(" + (L(0) * W.fw).toFixed(1) + "px, " + (L(1) * W.fh).toFixed(1) +
+        "px) translate(-50%, -50%)" + (A[3] !== 0 ? " rotate(" + turn.toFixed(1) + "deg)" : "") +
+        " scale(" + (W.vs * W.start.sc * L(2)).toFixed(3) + ")";
+      var m = []; for (var j = 4; j < 13; j++) m.push(L(j));
+      el.firstChild.style.transform = m3css(m3fix(m));
+    });
+    // Played out to the last sample and the end is in: they have landed.
+    if (W.done && t >= F[F.length - 1][0]) { watchFinish(); return; }
+  }
+  // Nothing new for a long while: the thrower's phone went quiet. Let it go.
+  if (t > 9000) { watchHide(0); return; }
+  W.raf = requestAnimationFrame(watchStep);
+}
+function watchFinish() {
+  if (!W) return;
+  W.done.forEach(function (r, i) { watchRest(i, r); });
+  W.el.querySelector(".dicefield").classList.remove("rolling");
+  var lbl = W.el.querySelector(".crvlbl");
+  var all = W.done.every(function (r) { return r[5]; }) || W.start.live.length === W.done.length;
+  if (lbl && all) lbl.innerHTML = lbl.innerHTML.replace(' is rolling', ' rolled') + ' <b>' + W.done.reduce(function (s, r) { return s + r[6]; }, 0) + '</b>';
+  watchHide(all ? 1600 : 2500);
+}
+function watchHide(ms) {
+  var w = W; if (!w) return;
+  if (w.hide) clearTimeout(w.hide);
+  w.hide = setTimeout(function () {
+    if (W !== w) return;
+    w.el.classList.add("out");
+    setTimeout(function () { if (W === w) { w.el.hidden = true; W = null; } }, 260);
+  }, ms);
+}
+
 window.CRDice={
-  open:function(cb){
+  open:function(cb,o){
     var r=function(){return 1+Math.floor(Math.random()*6)};
     secret={mode:'dice',dice:{count:2,vals:[r(),r()],rolling:false,pos:null,set:[],parked:[]}};
-    onDone=cb;sliceReady(DICE_SOUND);render();
+    onDone=cb;castFn=(o&&o.cast)||null;sliceReady(DICE_SOUND);render();
     // laid out against the real felt once it has a size
     requestAnimationFrame(function(){if(secret){secret.dice.pos=null;render()}});
   },
   close:close,
+  watch:watchFeed,
   isOpen:function(){return !!secret}
 };
 })();
